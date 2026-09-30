@@ -1,0 +1,2 @@
+import { NextResponse } from "next/server"; import { db } from "@/lib/db"; import { getSessionUserId } from "@/lib/auth";
+export async function POST(req:Request){const userId=await getSessionUserId(); if(!userId)return NextResponse.json({error:'Não autorizado'},{status:401}); const d=await req.json(); const r=await db.receipt.create({data:{userId,name:d.name,category:d.category,amount:Number(d.amount),expectedAt:new Date(d.expectedAt+'T12:00:00'),recurring:!!d.recurring}}); return NextResponse.json(r)}
