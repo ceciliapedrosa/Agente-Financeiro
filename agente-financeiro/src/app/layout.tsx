@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Agente Financeiro",
-  description: "Gestão pessoal de pagamentos, receitas e prioridades.",
+  title: "DIZI | Seu agente financeiro",
+  description: "Gestão pessoal de pagamentos, receitas e prioridades com a DIZI.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
