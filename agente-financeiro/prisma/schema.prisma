@@ -36,6 +36,7 @@ model User {
   createdAt           DateTime             @default(now())
   payments            Payment[]
   receipts            Receipt[]
+  cards               Card[]
   passwordResetTokens PasswordResetToken[]
 }
 
@@ -85,4 +86,20 @@ model Receipt {
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, expectedAt])
+}
+
+model Card {
+  id             String   @id @default(cuid())
+  userId         String
+  name           String
+  institution    String
+  creditLimit    Float
+  currentInvoice Float    @default(0)
+  closingDay     Int
+  dueDay         Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
