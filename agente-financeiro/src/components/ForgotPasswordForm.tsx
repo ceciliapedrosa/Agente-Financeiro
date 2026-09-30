@@ -10,13 +10,41 @@ export default function ForgotPasswordForm() {
 
   async function submit(e:React.FormEvent<HTMLFormElement>){
     e.preventDefault();
-    setLoading(true); setMessage(""); setError("");
-    const form=new FormData(e.currentTarget);
-    const res=await fetch("/api/auth/forgot-password",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:form.get("email")})});
-    const data=await res.json();
-    setLoading(false);
-    if(!res.ok) return setError(data.error || "Não foi possível solicitar a redefinição.");
-    setMessage(data.message || "Se o e-mail estiver cadastrado, você receberá um link para redefinir sua senha.");
+    setMessage("");
+    setError("");
+    setLoading(true);
+
+    const controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),15000);
+
+    try{
+      const form=new FormData(e.currentTarget);
+      const res=await fetch("/api/auth/forgot-password",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({email:form.get("email")}),
+        signal:controller.signal
+      });
+
+      const raw=await res.text();
+      let data:any={};
+      try{data=raw?JSON.parse(raw):{};}catch{data={};}
+
+      if(!res.ok){
+        throw new Error(data.error || "Não foi possível solicitar a redefinição.");
+      }
+
+      setMessage(data.message || "Se o e-mail estiver cadastrado, você receberá um link para redefinir sua senha.");
+    }catch(err){
+      if(err instanceof DOMException && err.name==="AbortError"){
+        setError("O envio demorou mais do que o esperado. Tente novamente em instantes.");
+      }else{
+        setError(err instanceof Error ? err.message : "Não foi possível solicitar a redefinição.");
+      }
+    }finally{
+      clearTimeout(timeout);
+      setLoading(false);
+    }
   }
 
   return <form onSubmit={submit} className="auth-card">
