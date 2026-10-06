@@ -71,3 +71,17 @@ button,input,select,textarea{font:inherit}
 
 @media(max-width:1100px){.stats-grid{grid-template-columns:repeat(2,1fr)}.card-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:760px){.landing-nav{padding:18px}.landing-nav .brand span:last-child{display:none}.hero{margin-top:45px}.hero h1{font-size:44px}.hero>p{font-size:16px}.trust-row{flex-wrap:wrap}.preview-shell{margin:0 16px 50px}.preview-side{display:none}.preview-grid{display:block}.preview-main{padding:18px}.stats-row{grid-template-columns:1fr}.fake-row{grid-template-columns:1.4fr 1fr 1fr}.fake-row i{display:none}.app-shell{display:block}.sidebar{display:none}.mobile-header{height:60px;background:#0a0a0a;color:#fff;display:flex;align-items:center;gap:9px;padding:0 16px}.mobile-header .brand-mark{width:32px;height:32px}.page{padding:22px 16px}.page-head{align-items:flex-start;flex-direction:column}.stats-grid,.card-grid,.report-grid{grid-template-columns:1fr}.grid-form{grid-template-columns:1fr}.grid-form .span2{grid-column:span 1}.hero-actions{flex-direction:column}.hero-actions .btn{width:100%}.credit-card-meta{flex-direction:column}}
+
+/* Shared native dialogs keep background controls inert and restore focus. */
+.accessible-modal{border:0;color:inherit;max-height:calc(100dvh - 32px);margin:auto}
+.accessible-modal::backdrop{background:rgba(0,0,0,.55)}
+:focus-visible{outline:3px solid #555;outline-offset:3px}
+button:disabled{cursor:wait;opacity:.65}
+.period-picker{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:20px}
+.period-picker label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:700}
+.period-picker input{padding:10px 12px;border:1px solid #ccc;border-radius:8px;background:white}
+.period-note{color:#555;font-size:13px;line-height:1.65;margin:8px 0 20px}
+.row-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.payment-details{min-width:190px;max-width:400px}.payment-details summary{cursor:pointer;font-weight:750}.payment-details p,.payment-details li{font-size:12px;line-height:1.6;overflow-wrap:anywhere}.payment-details h3{font-size:13px}
+.table-caption{text-align:left;padding:16px 20px;font-weight:700;font-size:13px}.metric-list b{white-space:nowrap}.bar-stack{border-bottom:1px solid #ddd}.bar-column>span{text-align:center}
+.realized-balance{display:flex;justify-content:space-between;align-items:center;gap:24px;padding:20px;margin-bottom:20px}.realized-balance h2{font-size:16px;margin:0 0 6px}.realized-balance p{font-size:12px;color:#666;margin:0;line-height:1.5}.realized-balance strong{font-size:24px;white-space:nowrap}@media(max-width:760px){.realized-balance{align-items:flex-start;flex-direction:column}}

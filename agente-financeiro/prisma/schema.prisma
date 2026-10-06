@@ -69,6 +69,8 @@ model Payment {
   updatedAt   DateTime      @updatedAt
   user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  events      PaymentEvent[]
+
   @@index([userId, dueDate])
   @@index([userId, status])
 }
@@ -102,4 +104,15 @@ model Card {
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+model PaymentEvent {
+  id String @id @default(cuid())
+  paymentId String
+  amount Float
+  paidAt DateTime
+  kind String
+  createdAt DateTime @default(now())
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  @@index([paymentId, createdAt])
 }
