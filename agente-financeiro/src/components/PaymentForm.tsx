@@ -1,10 +1,225 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, X } from "lucide-react";
-
-export default function PaymentForm(){
- const [open,setOpen]=useState(false); const [busy,setBusy]=useState(false); const router=useRouter();
- async function submit(e:React.FormEvent<HTMLFormElement>){ e.preventDefault(); setBusy(true); const fd=new FormData(e.currentTarget); const payload=Object.fromEntries(fd.entries()); const r=await fetch('/api/payments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); setBusy(false); if(r.ok){setOpen(false); router.refresh();}}
- return <>{<button className="btn primary" onClick={()=>setOpen(true)}><Plus size={17}/> Nova conta</button>}{open&&<div className="modal-wrap"><div className="modal-card"><div className="modal-head"><div><h2>Nova conta</h2><p>Cadastre um pagamento e defina sua prioridade.</p></div><button className="icon-btn" onClick={()=>setOpen(false)}><X/></button></div><form className="grid-form" onSubmit={submit}><label className="span2">Nome da conta<input name="name" placeholder="Ex.: Aluguel" required/></label><label>Valor<input name="amount" type="number" step="0.01" min="0.01" placeholder="0,00" required/></label><label>Vencimento<input name="dueDate" type="date" required/></label><label>Categoria<select name="category"><option>Moradia</option><option>Alimentação</option><option>Transporte</option><option>Saúde</option><option>Educação</option><option>Lazer</option><option>Cartão</option><option>Outros</option></select></label><label>Prioridade<select name="priority"><option value="ESSENTIAL">Essencial</option><option value="HIGH">Alta</option><option value="MEDIUM">Média</option><option value="LOW">Baixa</option></select></label><label>Recorrência<select name="recurrence"><option value="NONE">Não recorrente</option><option value="MONTHLY">Mensal</option><option value="YEARLY">Anual</option></select></label><label>Status<select name="status"><option value="PENDING">A pagar</option><option value="PAID">Pago</option><option value="PARTIAL">Parcial</option></select></label><label className="span2">Observações<textarea name="notes" placeholder="Informações opcionais"/></label><div className="modal-actions span2"><button type="button" className="btn secondary" onClick={()=>setOpen(false)}>Cancelar</button><button className="btn primary" disabled={busy}>{busy?'Salvando...':'Salvar conta'}</button></div></form></div></div>}</>
+import { Plus } from "lucide-react";
+import Modal from "./Modal";
+import { todayISO } from "@/lib/finance";
+export type EditablePayment = {
+  id: string;
+  name: string;
+  amount: number;
+  dueDate: string;
+  category: string;
+  priority: string;
+  recurrence: string;
+  notes: string | null;
+  updatedAt: string;
+};
+export default function PaymentForm({
+  payment,
+}: {
+  payment?: EditablePayment;
+}) {
+  const [open, setOpen] = useState(false),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState(""),
+    [status, setStatus] = useState("PENDING");
+  const router = useRouter();
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    const payload = {
+      ...Object.fromEntries(new FormData(e.currentTarget)),
+      ...(payment
+        ? { id: payment.id, updatedAt: payment.updatedAt, action: "edit" }
+        : {}),
+    };
+    try {
+      const r = await fetch("/api/payments", {
+        method: payment ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const d = await r.json();
+      if (!r.ok) {
+        setError(d.error || "Não foi possível salvar.");
+        return;
+      }
+      setOpen(false);
+      router.refresh();
+    } catch {
+      setError("Falha de conexão. Tente novamente.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <>
+      <button
+        className={payment ? "small-action" : "btn primary"}
+        onClick={() => {
+          setError("");
+          setStatus("PENDING");
+          setOpen(true);
+        }}
+      >
+        {!payment && <Plus size={17} />}{" "}
+        {payment ? "Editar conta" : "Nova conta"}
+      </button>
+      {open && (
+        <Modal
+          title={payment ? "Editar conta" : "Nova conta"}
+          description={
+            payment
+              ? "Atualize os dados. Os pagamentos registrados serão preservados."
+              : "Cadastre um pagamento e defina sua prioridade."
+          }
+          onClose={() => setOpen(false)}
+          busy={busy}
+        >
+          <form className="grid-form" onSubmit={submit}>
+            <label className="span2">
+              Nome da conta
+              <input
+                name="name"
+                defaultValue={payment?.name}
+                placeholder="Ex.: Aluguel"
+                maxLength={200}
+                required
+              />
+            </label>
+            <label>
+              Valor (R$)
+              <input
+                name="amount"
+                type="number"
+                step="0.01"
+                min="0.01"
+                max="999999999"
+                defaultValue={payment?.amount}
+                required
+              />
+            </label>
+            <label>
+              Vencimento
+              <input
+                name="dueDate"
+                type="date"
+                defaultValue={payment?.dueDate}
+                required
+              />
+            </label>
+            <label>
+              Categoria
+              <select name="category" defaultValue={payment?.category}>
+                {Array.from(
+                  new Set([
+                    "Moradia",
+                    "Alimentação",
+                    "Transporte",
+                    "Saúde",
+                    "Educação",
+                    "Lazer",
+                    "Cartão",
+                    "Outros",
+                    ...(payment ? [payment.category] : []),
+                  ]),
+                ).map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Prioridade
+              <select
+                name="priority"
+                defaultValue={payment?.priority ?? "ESSENTIAL"}
+              >
+                <option value="ESSENTIAL">Essencial</option>
+                <option value="HIGH">Alta</option>
+                <option value="MEDIUM">Média</option>
+                <option value="LOW">Baixa</option>
+              </select>
+            </label>
+            <label>
+              Recorrência
+              <select
+                name="recurrence"
+                defaultValue={payment?.recurrence ?? "NONE"}
+              >
+                <option value="NONE">Não recorrente</option>
+                <option value="MONTHLY">Mensal</option>
+                <option value="YEARLY">Anual</option>
+              </select>
+            </label>
+            {!payment && (
+              <label>
+                Status
+                <select
+                  name="status"
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                >
+                  <option value="PENDING">A pagar</option>
+                  <option value="PAID">Pago</option>
+                  <option value="PARTIAL">Parcial</option>
+                </select>
+              </label>
+            )}
+            {!payment && status === "PARTIAL" && (
+              <label>
+                Valor já pago (R$)
+                <input
+                  name="paidAmount"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  required
+                />
+              </label>
+            )}
+            {!payment && status !== "PENDING" && (
+              <label>
+                Data do pagamento
+                <input
+                  name="paidAt"
+                  type="date"
+                  defaultValue={todayISO()}
+                  max={todayISO()}
+                  required
+                />
+              </label>
+            )}
+            <label className="span2">
+              Observações
+              <textarea
+                name="notes"
+                defaultValue={payment?.notes ?? ""}
+                maxLength={5000}
+              />
+            </label>
+            {error && (
+              <p className="form-error span2" role="alert">
+                {error}
+              </p>
+            )}
+            <div className="modal-actions span2">
+              <button
+                type="button"
+                className="btn secondary"
+                disabled={busy}
+                onClick={() => setOpen(false)}
+              >
+                Cancelar
+              </button>
+              <button className="btn primary" disabled={busy}>
+                {busy ? "Salvando..." : "Salvar conta"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </>
+  );
 }

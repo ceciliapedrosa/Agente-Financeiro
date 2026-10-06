@@ -1,0 +1,22 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+const mocks=vi.hoisted(()=>({session:vi.fn(),find:vi.fn(),update:vi.fn(),create:vi.fn(),event:vi.fn(),lock:vi.fn()}));
+vi.mock('@/lib/auth',()=>({getSessionUserId:mocks.session}));
+vi.mock('@/lib/db',()=>({db:{payment:{create:mocks.create},$transaction:async(fn:Function)=>fn({$queryRaw:mocks.lock,payment:{findFirst:mocks.find,update:mocks.update},paymentEvent:{create:mocks.event}})}}));
+import { POST, PATCH } from '../src/app/api/payments/route';
+const timestamp='2026-09-30T12:00:00.000Z';
+const base={id:'account',userId:'owner',amount:100,paidAmount:30,status:'PARTIAL',paidAt:new Date(timestamp),updatedAt:new Date(timestamp),events:[{amount:30}]};
+const request=(body:unknown)=>new Request('http://localhost/api/payments',{method:'PATCH',body:JSON.stringify(body)});
+const identity={id:'account',updatedAt:timestamp};
+beforeEach(()=>{vi.clearAllMocks();mocks.session.mockResolvedValue('owner');mocks.find.mockResolvedValue(base);mocks.update.mockImplementation(async({data})=>({...base,...data}));mocks.create.mockImplementation(async({data})=>data);});
+describe('payment API guards and financial changes',()=>{
+ it('rejects unauthenticated writes',async()=>{mocks.session.mockResolvedValue(null);expect((await PATCH(request({}))).status).toBe(401);expect(mocks.find).not.toHaveBeenCalled();});
+ it('scopes every lookup to the signed-in owner',async()=>{mocks.find.mockResolvedValue(null);expect((await PATCH(request({...identity,action:'reopen'}))).status).toBe(404);expect(mocks.find.mock.calls[0][0].where).toEqual({id:'account',userId:'owner'});expect(mocks.update).not.toHaveBeenCalled();});
+ it('records only the new partial amount and keeps the remainder',async()=>{const r=await PATCH(request({...identity,action:'payment',amount:20,paidAt:'2026-09-30'}));expect(r.status).toBe(200);expect((await r.json()).paidAmount).toBe(50);expect(mocks.event.mock.calls[0][0].data.amount).toBe(20);});
+ it('settles just the remainder',async()=>{const r=await PATCH(request({...identity,action:'settle',paidAt:'2026-09-30'}));expect(r.status).toBe(200);const d=await r.json();expect(d.paidAmount).toBe(100);expect(d.status).toBe('PAID');expect(mocks.event.mock.calls[0][0].data.amount).toBe(70);});
+ it('rejects overpayment without updating totals',async()=>{expect((await PATCH(request({...identity,action:'payment',amount:71,paidAt:'2026-09-30'}))).status).toBe(400);expect(mocks.update).not.toHaveBeenCalled();expect(mocks.event).not.toHaveBeenCalled();});
+ it('rejects stale writes from another tab',async()=>{expect((await PATCH(request({...identity,updatedAt:'2026-09-29T12:00:00.000Z',action:'reopen'}))).status).toBe(409);expect(mocks.event).not.toHaveBeenCalled();});
+ it('reopens through an auditable reversal',async()=>{const r=await PATCH(request({...identity,action:'reopen'}));expect(r.status).toBe(200);expect((await r.json()).paidAmount).toBe(0);expect(mocks.event.mock.calls[0][0].data).toMatchObject({kind:'REVERSAL',amount:-30});});
+ it('preserves legacy paid totals when changing amount',async()=>{mocks.find.mockResolvedValue({...base,status:'PAID',paidAmount:null,events:[]});const r=await PATCH(request({...identity,action:'edit',name:'Conta',category:'Outros',amount:150,dueDate:'2026-10-20',priority:'HIGH',recurrence:'NONE'}));expect(r.status).toBe(200);expect(await r.json()).toMatchObject({status:'PARTIAL',paidAmount:100,amount:150});expect(mocks.event.mock.calls[0][0].data).toMatchObject({kind:'LEGACY',amount:100});});
+ it('requires a real partial value and payment date when creating a partial account',async()=>{const r=await POST(request({name:'Conta',category:'Outros',amount:100,dueDate:'2026-10-20',priority:'HIGH',recurrence:'NONE',status:'PARTIAL'}));expect(r.status).toBe(400);expect(mocks.create).not.toHaveBeenCalled();});
+ it('creates partial accounts with history',async()=>{const r=await POST(request({name:'Conta',category:'Outros',amount:100,dueDate:'2026-10-20',priority:'HIGH',recurrence:'NONE',status:'PARTIAL',paidAmount:25,paidAt:'2026-09-30'}));expect(r.status).toBe(201);expect(mocks.create.mock.calls[0][0].data).toMatchObject({paidAmount:25,status:'PARTIAL',events:{create:{amount:25}}});});
+});
