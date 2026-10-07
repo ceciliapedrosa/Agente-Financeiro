@@ -1,13 +1,19 @@
 "use client";
 import { useState } from "react";
 import Modal from "./Modal";
+import RecurrenceFields from "./RecurrenceFields";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 
-export default function ReceiptForm() {
+export default function ReceiptForm({
+  initialDate = "",
+}: {
+  initialDate?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [firstDate, setFirstDate] = useState("");
   const router = useRouter();
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -15,7 +21,7 @@ export default function ReceiptForm() {
     setError("");
     const fd = new FormData(e.currentTarget);
     const payload = Object.fromEntries(fd.entries());
-    payload.recurring = fd.get("recurring") === "on" ? "true" : "";
+
     try {
       const res = await fetch("/api/receipts", {
         method: "POST",
@@ -37,7 +43,14 @@ export default function ReceiptForm() {
   }
   return (
     <>
-      <button className="btn primary" onClick={() => setOpen(true)}>
+      <button
+        className="btn primary"
+        onClick={() => {
+          setFirstDate(initialDate);
+          setError("");
+          setOpen(true);
+        }}
+      >
         <Plus size={17} /> Nova receita
       </button>
       {open && (
@@ -64,7 +77,13 @@ export default function ReceiptForm() {
             </label>
             <label>
               Data prevista
-              <input name="expectedAt" type="date" required />
+              <input
+                name="expectedAt"
+                type="date"
+                value={firstDate}
+                onChange={(e) => setFirstDate(e.target.value)}
+                required
+              />
             </label>
             <label>
               Categoria
@@ -84,9 +103,7 @@ export default function ReceiptForm() {
                 <option value="RECEIVED">Recebida</option>
               </select>
             </label>
-            <label className="check-row span2">
-              <input name="recurring" type="checkbox" /> Receita recorrente
-            </label>
+            <RecurrenceFields start={firstDate} />
             {error && (
               <div role="alert" className="form-error span2">
                 {error}
@@ -95,6 +112,7 @@ export default function ReceiptForm() {
             <div className="modal-actions span2">
               <button
                 type="button"
+                data-modal-close
                 className="btn secondary"
                 disabled={busy}
                 onClick={() => setOpen(false)}

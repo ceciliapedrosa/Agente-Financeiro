@@ -9,11 +9,15 @@ import {
   totals,
   paidValue,
   cents,
+  todayISO,
 } from "@/lib/finance";
 import AppShell from "@/components/AppShell";
 import PeriodPicker from "@/components/PeriodPicker";
 import PaymentForm from "@/components/PaymentForm";
 import StatusBadge from "@/components/StatusBadge";
+import ReceiptForm from "@/components/ReceiptForm";
+import DueBadge from "@/components/DueBadge";
+import { urgency, urgencyLabels } from "@/lib/urgency";
 export default async function Dashboard({
   searchParams,
 }: {
@@ -25,7 +29,10 @@ export default async function Dashboard({
   if (!user) redirect("/login");
   const period = monthPeriod((await searchParams).month);
   const range = { gte: period.start, lt: period.end };
-  const [payments, receipts, future, receivedTotal, recordedPayments] =
+  const today = todayISO();
+  const attentionEnd = new Date(today + "T23:59:59Z");
+  attentionEnd.setUTCDate(attentionEnd.getUTCDate() + 7);
+  const [payments, receipts, future, receivedTotal, recordedPayments, urgent] =
     await Promise.all([
       db.payment.findMany({
         where: { userId, dueDate: range },
@@ -45,6 +52,14 @@ export default async function Dashboard({
       }),
       db.payment.findMany({
         where: { userId, OR: [{ status: "PAID" }, { paidAmount: { gt: 0 } }] },
+      }),
+      db.payment.findMany({
+        where: {
+          userId,
+          status: { not: "PAID" },
+          dueDate: { lte: attentionEnd },
+        },
+        orderBy: { dueDate: "asc" },
       }),
     ]);
   const realized =
@@ -75,6 +90,18 @@ export default async function Dashboard({
           <strong>{brl.format(realized)}</strong>
         </section>
         <PeriodPicker action="/dashboard" month={period.key} />
+        {summary.income === 0 && (
+          <section className="panel guidance-card">
+            <div>
+              <h2>Adicione suas receitas de {period.label}</h2>
+              <p>
+                Sem receitas cadastradas, a previsão considera apenas as contas.
+                Cadastre suas entradas para planejar o mês.
+              </p>
+            </div>
+            <ReceiptForm initialDate={period.key + "-01"} />
+          </section>
+        )}
         <div className="stats-grid">
           {[
             [
@@ -110,6 +137,37 @@ export default async function Dashboard({
           O saldo previsto não é seu saldo bancário. Compromissos após este mês:{" "}
           <b>{brl.format(future.reduce((s, p) => s + remaining(p), 0))}</b>.
         </p>
+        <section className="panel attention-panel">
+          <div className="panel-head">
+            <div>
+              <h2>Precisa da sua atenção</h2>
+              <p>
+                Vencimentos em relação a hoje, incluindo atrasos de meses
+                anteriores. Independente do mês selecionado.
+              </p>
+            </div>
+          </div>
+          <div className="attention-grid">
+            {(["OVERDUE", "TODAY", "UPCOMING"] as const).map((kind) => {
+              const group = urgent.filter((p) => urgency(p, today) === kind);
+              return (
+                <Link
+                  key={kind}
+                  href={`/pagamentos?status=${kind}&month=${period.key}`}
+                  className={`attention-card attention-${kind.toLowerCase()}`}
+                >
+                  <span>{urgencyLabels[kind]}</span>
+                  <strong>
+                    {brl.format(
+                      group.reduce((sum, p) => sum + remaining(p), 0),
+                    )}
+                  </strong>
+                  <small>{group.length} contas · ver detalhes →</small>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
         <section className="panel">
           <div className="panel-head">
             <div>
@@ -150,7 +208,10 @@ export default async function Dashboard({
                         </Link>
                         <small>{p.category}</small>
                       </td>
-                      <td>{shortDate.format(p.dueDate)}</td>
+                      <td>
+                        {shortDate.format(p.dueDate)}
+                        <DueBadge payment={p} />
+                      </td>
                       <td>{brl.format(remaining(p))}</td>
                       <td>
                         <StatusBadge status={p.status} />

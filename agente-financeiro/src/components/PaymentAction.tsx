@@ -123,6 +123,7 @@ export default function PaymentAction({
             <div className="modal-actions span2">
               <button
                 type="button"
+                data-modal-close
                 className="btn secondary"
                 disabled={busy}
                 onClick={() => setAction(null)}

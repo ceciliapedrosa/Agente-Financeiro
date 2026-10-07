@@ -22,7 +22,7 @@ export default async function Page(){
       <div className="stat-card"><div className="stat-icon"><Wallet/></div><small>Total previsto</small><strong>{brl.format(total)}</strong><span>{rs.length} receitas cadastradas</span></div>
       <div className="stat-card"><div className="stat-icon"><ArrowDownToLine/></div><small>Recebido</small><strong>{brl.format(received)}</strong><span>{rs.filter(r=>r.receivedAt).length} recebidas</span></div>
       <div className="stat-card"><div className="stat-icon"><CalendarDays/></div><small>A receber</small><strong>{brl.format(pending)}</strong><span>{rs.filter(r=>!r.receivedAt).length} pendentes</span></div>
-      <div className="stat-card"><div className="stat-icon"><Repeat2/></div><small>Recorrentes</small><strong>{recurring}</strong><span>fontes recorrentes</span></div>
+      <div className="stat-card"><div className="stat-icon"><Repeat2/></div><small>Recorrentes</small><strong>{recurring}</strong><span>lançamentos recorrentes</span></div>
     </div>
     <section className="panel"><div className="panel-head"><div><h2>Entradas</h2><p>Histórico e previsão das suas receitas.</p></div></div>
       {rs.length===0?<div className="empty">Nenhuma receita cadastrada. Use “Nova receita” para começar.</div>:<div className="table-wrap"><table><thead><tr><th>Receita</th><th>Data</th><th>Valor</th><th>Recorrência</th><th>Status</th></tr></thead><tbody>

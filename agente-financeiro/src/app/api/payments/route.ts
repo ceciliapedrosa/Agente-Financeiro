@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
+import { occurrenceDates } from "@/lib/recurrence";
 import { db } from "@/lib/db";
 import { getSessionUserId } from "@/lib/auth";
 import { cents, money, paidValue, paymentState, todayISO } from "@/lib/finance";
@@ -30,6 +31,8 @@ const details = z.object({
   notes: z.string().max(5000).optional(),
 });
 const initial = details.extend({
+  occurrences: z.coerce.number().int().min(2).max(60).optional(),
+  recurrenceEnd: z.union([date, z.literal("")]).optional(),
   status: z.enum(["PENDING", "PAID", "PARTIAL"]),
   paidAmount: amount.optional(),
   paidAt: date.optional(),
@@ -96,32 +99,68 @@ export async function POST(req: Request) {
       );
     if (paid > 0 && (!d.paidAt || d.paidAt > todayISO()))
       throw new RequestError("Informe uma data de pagamento válida, até hoje.");
-    const payment = await db.payment.create({
-      data: {
-        userId,
-        name: d.name,
-        category: d.category,
-        amount: money(d.amount),
-        dueDate: asDate(d.dueDate),
-        priority: d.priority,
-        recurrence: d.recurrence,
-        notes: d.notes || null,
-        status: paymentState(d.amount, paid),
-        paidAmount: money(paid),
-        paidAt: paid ? asDate(d.paidAt!) : null,
-        ...(paid
-          ? {
-              events: {
-                create: {
-                  amount: money(paid),
-                  paidAt: asDate(d.paidAt!),
-                  kind: "PAYMENT",
-                },
+    let dates: string[];
+    try {
+      dates = occurrenceDates(
+        d.dueDate,
+        d.recurrence,
+        d.occurrences ?? 12,
+        d.recurrenceEnd || undefined,
+      );
+    } catch (error) {
+      throw new RequestError((error as Error).message);
+    }
+    const data: Prisma.PaymentUncheckedCreateInput = {
+      userId,
+      name: d.name,
+      category: d.category,
+      amount: money(d.amount),
+      dueDate: asDate(d.dueDate),
+      priority: d.priority,
+      recurrence: d.recurrence,
+      notes: d.notes || null,
+      status: paymentState(d.amount, paid),
+      paidAmount: money(paid),
+      paidAt: paid ? asDate(d.paidAt!) : null,
+      ...(paid
+        ? {
+            events: {
+              create: {
+                amount: money(paid),
+                paidAt: asDate(d.paidAt!),
+                kind: "PAYMENT",
               },
-            }
-          : {}),
-      },
-    });
+            },
+          }
+        : {}),
+    };
+    const payment =
+      dates.length === 1
+        ? await db.payment.create({ data })
+        : await db.$transaction(
+            async (tx) => {
+              let first;
+              for (let i = 0; i < dates.length; i++) {
+                const item = await tx.payment.create({
+                  data: {
+                    ...data,
+                    dueDate: asDate(dates[i]),
+                    ...(i
+                      ? {
+                          status: "PENDING",
+                          paidAmount: 0,
+                          paidAt: null,
+                          events: undefined,
+                        }
+                      : {}),
+                  },
+                });
+                if (i === 0) first = item;
+              }
+              return first!;
+            },
+            { timeout: 15000 },
+          );
     return NextResponse.json(payment, { status: 201 });
   } catch (error) {
     return errorResponse(error);
