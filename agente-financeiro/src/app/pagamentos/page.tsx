@@ -6,7 +6,11 @@ import { monthPeriod, remaining, paidValue, todayISO } from "@/lib/finance";
 import AppShell from "@/components/AppShell";
 import PaymentForm from "@/components/PaymentForm";
 import PaymentAction from "@/components/PaymentAction";
-import PeriodPicker from "@/components/PeriodPicker";
+import FinancialFilters from "@/components/FinancialFilters";
+import EmptyState from "@/components/EmptyState";
+import Link from "next/link";
+import { filterFinancialRows } from "@/lib/financial-search";
+import { cents } from "@/lib/finance";
 import StatusBadge from "@/components/StatusBadge";
 import DueBadge from "@/components/DueBadge";
 import { urgency } from "@/lib/urgency";
@@ -14,7 +18,13 @@ const dateFormat = new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" });
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; month?: string }>;
+  searchParams: Promise<{
+    status?: string;
+    month?: string;
+    q?: string;
+    category?: string;
+    sort?: string;
+  }>;
 }) {
   const userId = await getSessionUserId();
   if (!userId) redirect("/login");
@@ -22,7 +32,33 @@ export default async function Page({
   if (!user) redirect("/login");
   const query = await searchParams;
   const period = monthPeriod(query.month);
-  const status = query.status ?? "ALL";
+  const status = [
+    "ALL",
+    "PENDING",
+    "PAID",
+    "PARTIAL",
+    "OVERDUE",
+    "TODAY",
+    "UPCOMING",
+  ].includes(query.status ?? "")
+    ? query.status!
+    : "ALL";
+  const q = (query.q ?? "").slice(0, 200),
+    category = query.category ?? "",
+    sort = ["date_asc", "date_desc", "amount_asc", "amount_desc"].includes(
+      query.sort ?? "",
+    )
+      ? query.sort!
+      : "date_asc";
+  const month = query.month === "all" ? "all" : period.key;
+  const categoryRows = await db.payment.findMany({
+    where: { userId },
+    select: { category: true },
+    distinct: ["category"],
+  });
+  const categories = categoryRows
+    .map((r) => r.category)
+    .sort((a, b) => a.localeCompare(b, "pt-BR"));
   const urgentFilter = ["OVERDUE", "TODAY", "UPCOMING"].includes(status);
   const today = todayISO();
   const end = new Date(today + "T23:59:59Z");
@@ -32,12 +68,14 @@ export default async function Page({
       userId,
       ...(urgentFilter
         ? { status: { not: "PAID" as const }, dueDate: { lte: end } }
-        : { dueDate: { gte: period.start, lt: period.end } }),
+        : month === "all"
+          ? {}
+          : { dueDate: { gte: period.start, lt: period.end } }),
     },
     orderBy: { dueDate: "asc" },
     include: { events: { orderBy: { createdAt: "asc" } } },
   });
-  const payments = all.filter((p) =>
+  const matched = all.filter((p) =>
     urgentFilter
       ? urgency(p, today) === status
       : status === "PENDING"
@@ -46,6 +84,17 @@ export default async function Page({
           ? p.status === status
           : true,
   );
+  const payments = filterFinancialRows(
+    matched,
+    q,
+    category,
+    sort,
+    (p) => p.dueDate,
+  );
+  const filteredTotal =
+    payments.reduce((sum, p) => sum + cents(p.amount), 0) / 100;
+  const filteredRemaining =
+    payments.reduce((sum, p) => sum + cents(remaining(p)), 0) / 100;
   const tabs = [
     ["ALL", "Todos"],
     ["PENDING", "A pagar"],
@@ -65,29 +114,40 @@ export default async function Page({
             <p>
               {urgentFilter
                 ? "Vencimentos em relação a hoje, incluindo outros meses. O filtro de mês não limita esta lista."
-                : `Contas com vencimento em ${period.label}. Abra o nome para ver detalhes.`}
+                : month === "all"
+                  ? "Contas de todos os meses. Abra o nome para ver detalhes."
+                  : `Contas com vencimento em ${period.label}. Abra o nome para ver detalhes.`}
             </p>
           </div>
           <PaymentForm />
         </div>
-        {!urgentFilter && (
-          <PeriodPicker
-            action="/pagamentos"
-            month={period.key}
-            status={status}
-          />
-        )}
+        <FinancialFilters
+          key={JSON.stringify(query)}
+          action="/pagamentos"
+          month={month}
+          status={status}
+          q={q}
+          category={category}
+          sort={sort}
+          categories={categories}
+          urgent={urgentFilter}
+        />
         <div className="tabs">
           {tabs.map(([key, label]) => (
             <a
               key={key}
-              href={`/pagamentos?status=${key}&month=${period.key}`}
+              href={`/pagamentos?${new URLSearchParams({ status: key, month, q, category, sort }).toString()}`}
               className={status === key ? "tab active" : "tab"}
             >
               {label}
             </a>
           ))}
         </div>
+        <p className="filtered-summary" role="status">
+          {payments.length} resultado(s) · Total filtrado:{" "}
+          <strong>{brl.format(filteredTotal)}</strong> · Restante:{" "}
+          <strong>{brl.format(filteredRemaining)}</strong>
+        </p>
         <section className="panel">
           <div className="table-wrap">
             <table>
@@ -193,7 +253,15 @@ export default async function Page({
               </tbody>
             </table>
             {!payments.length && (
-              <div className="empty">Nenhuma conta neste período e filtro.</div>
+              <EmptyState
+                title="Nenhuma conta encontrada"
+                description="Ajuste os filtros ou cadastre uma despesa para acompanhar valor, pagamento e vencimento."
+              >
+                <Link className="btn secondary" href="/pagamentos?month=all">
+                  Ver todas as contas
+                </Link>
+                <PaymentForm buttonLabel="Adicionar despesa" />
+              </EmptyState>
             )}
           </div>
         </section>

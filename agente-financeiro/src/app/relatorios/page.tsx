@@ -3,6 +3,9 @@ import { getSessionUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { brl } from "@/lib/format";
 import { monthPeriod, totals, remaining } from "@/lib/finance";
+import EmptyState from "@/components/EmptyState";
+import PaymentForm from "@/components/PaymentForm";
+import ReceiptForm from "@/components/ReceiptForm";
 import AppShell from "@/components/AppShell";
 import PeriodPicker from "@/components/PeriodPicker";
 export default async function Page({
@@ -63,6 +66,17 @@ export default async function Page({
           </div>
         </div>
         <PeriodPicker action="/relatorios" month={period.key} />
+        {historyPayments.length === 0 && historyReceipts.length === 0 && (
+          <section className="panel">
+            <EmptyState
+              title="Seus relatórios começam com o primeiro lançamento"
+              description="Adicione receitas e despesas para acompanhar sua evolução e comparar os meses."
+            >
+              <ReceiptForm buttonLabel="Adicionar receita" />
+              <PaymentForm buttonLabel="Adicionar despesa" />
+            </EmptyState>
+          </section>
+        )}
         <div className="stats-grid">
           {[
             ["Receitas previstas", summary.income],
@@ -187,7 +201,12 @@ export default async function Page({
                   </div>
                 ))}
               {!payments.length && (
-                <div className="empty">Sem despesas neste mês.</div>
+                <EmptyState
+                  title="Sem despesas neste mês"
+                  description="Registre uma despesa para identificar onde você mais gasta."
+                >
+                  <PaymentForm buttonLabel="Adicionar despesa" />
+                </EmptyState>
               )}
             </div>
           </section>
