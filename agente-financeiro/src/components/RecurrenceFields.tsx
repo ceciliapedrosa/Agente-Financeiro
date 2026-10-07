@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { DateInput, TextInput } from "./FormInputs";
 import { occurrenceDates, type Frequency } from "@/lib/recurrence";
 export default function RecurrenceFields({
   start,
@@ -49,7 +50,7 @@ export default function RecurrenceFields({
           <>
             <label>
               Quantidade de lançamentos
-              <input
+              <TextInput
                 name="occurrences"
                 type="number"
                 min="2"
@@ -61,12 +62,12 @@ export default function RecurrenceFields({
             </label>
             <label>
               Término opcional
-              <input
+              <DateInput
                 name="recurrenceEnd"
-                type="date"
-                min={start || undefined}
                 value={end}
-                onChange={(e) => setEnd(e.target.value)}
+                onChange={setEnd}
+                min={start || undefined}
+                required={false}
               />
             </label>
             <div className="recurrence-preview span2" aria-live="polite">

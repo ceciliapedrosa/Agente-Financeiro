@@ -15,6 +15,7 @@ import AppShell from "@/components/AppShell";
 import PeriodPicker from "@/components/PeriodPicker";
 import PaymentForm from "@/components/PaymentForm";
 import StatusBadge from "@/components/StatusBadge";
+import EmptyState from "@/components/EmptyState";
 import ReceiptForm from "@/components/ReceiptForm";
 import DueBadge from "@/components/DueBadge";
 import { urgency, urgencyLabels } from "@/lib/urgency";
@@ -25,7 +26,10 @@ export default async function Dashboard({
 }) {
   const userId = await getSessionUserId();
   if (!userId) redirect("/login");
-  const user = await db.user.findUnique({ where: { id: userId } });
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    include: { _count: { select: { payments: true, receipts: true } } },
+  });
   if (!user) redirect("/login");
   const period = monthPeriod((await searchParams).month);
   const range = { gte: period.start, lt: period.end };
@@ -47,7 +51,10 @@ export default async function Dashboard({
         },
       }),
       db.receipt.aggregate({
-        where: { userId, receivedAt: { lte: new Date() } },
+        where: {
+          userId,
+          receivedAt: { lte: new Date(today + "T23:59:59.999Z") },
+        },
         _sum: { amount: true },
       }),
       db.payment.findMany({
@@ -77,8 +84,32 @@ export default async function Dashboard({
             <h1>Olá, {user.name.split(" ")[0]} 👋</h1>
             <p>Organização financeira de {period.label}.</p>
           </div>
-          <PaymentForm />
+          <div className="quick-actions">
+            <ReceiptForm buttonLabel="Adicionar receita" />
+            <PaymentForm buttonLabel="Adicionar despesa" />
+          </div>
         </div>
+        {user._count.payments === 0 && user._count.receipts === 0 && (
+          <section className="panel onboarding">
+            <h2>Comece com duas informações</h2>
+            <ol>
+              <li>
+                <strong>Cadastre uma receita</strong>
+                <span>Informe quanto espera receber e quando.</span>
+              </li>
+              <li>
+                <strong>Adicione uma despesa</strong>
+                <span>
+                  Registre valor e vencimento para acompanhar o que falta pagar.
+                </span>
+              </li>
+            </ol>
+            <p>
+              O painel calcula sua previsão e organiza os próximos vencimentos
+              conforme você preenche.
+            </p>
+          </section>
+        )}
         <section className="panel realized-balance">
           <div>
             <h2>Saldo realizado registrado</h2>
@@ -184,7 +215,12 @@ export default async function Dashboard({
             </Link>
           </div>
           {pending.length === 0 ? (
-            <div className="empty">Nenhuma conta pendente neste mês.</div>
+            <EmptyState
+              title="Nenhuma conta pendente neste mês"
+              description="Cadastre sua próxima despesa para acompanhar os vencimentos e planejar quanto vai sobrar."
+            >
+              <PaymentForm buttonLabel="Adicionar despesa" />
+            </EmptyState>
           ) : (
             <div className="table-wrap">
               <table>

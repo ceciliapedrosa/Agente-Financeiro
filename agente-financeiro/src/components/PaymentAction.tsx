@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Modal from "./Modal";
+import { MoneyInput, DateInput } from "./FormInputs";
 import { brl } from "@/lib/format";
 import { todayISO } from "@/lib/finance";
 export default function PaymentAction({
@@ -93,25 +94,16 @@ export default function PaymentAction({
             {action === "payment" && (
               <label>
                 Valor deste pagamento (R$)
-                <input
-                  name="amount"
-                  type="number"
-                  min="0.01"
-                  max={remaining}
-                  step="0.01"
-                  required
-                />
+                <MoneyInput name="amount" max={remaining} />
               </label>
             )}
             {action !== "reopen" && (
               <label>
                 Data do pagamento
-                <input
+                <DateInput
                   name="paidAt"
-                  type="date"
                   defaultValue={todayISO()}
                   max={todayISO()}
-                  required
                 />
               </label>
             )}
