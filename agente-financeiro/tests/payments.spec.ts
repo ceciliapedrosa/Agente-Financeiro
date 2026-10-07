@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks=vi.hoisted(()=>({session:vi.fn(),find:vi.fn(),update:vi.fn(),create:vi.fn(),event:vi.fn(),lock:vi.fn()}));
 vi.mock('@/lib/auth',()=>({getSessionUserId:mocks.session}));
-vi.mock('@/lib/db',()=>({db:{payment:{create:mocks.create},$transaction:async(fn:Function)=>fn({$queryRaw:mocks.lock,payment:{findFirst:mocks.find,update:mocks.update},paymentEvent:{create:mocks.event}})}}));
+vi.mock('@/lib/db',()=>({db:{payment:{create:mocks.create},$transaction:async(fn:Function)=>fn({$queryRaw:mocks.lock,payment:{create:mocks.create,findFirst:mocks.find,update:mocks.update},paymentEvent:{create:mocks.event}})}}));
 import { POST, PATCH } from '../src/app/api/payments/route';
 const timestamp='2026-09-30T12:00:00.000Z';
 const base={id:'account',userId:'owner',amount:100,paidAmount:30,status:'PARTIAL',paidAt:new Date(timestamp),updatedAt:new Date(timestamp),events:[{amount:30}]};
@@ -19,4 +19,12 @@ describe('payment API guards and financial changes',()=>{
  it('preserves legacy paid totals when changing amount',async()=>{mocks.find.mockResolvedValue({...base,status:'PAID',paidAmount:null,events:[]});const r=await PATCH(request({...identity,action:'edit',name:'Conta',category:'Outros',amount:150,dueDate:'2026-10-20',priority:'HIGH',recurrence:'NONE'}));expect(r.status).toBe(200);expect(await r.json()).toMatchObject({status:'PARTIAL',paidAmount:100,amount:150});expect(mocks.event.mock.calls[0][0].data).toMatchObject({kind:'LEGACY',amount:100});});
  it('requires a real partial value and payment date when creating a partial account',async()=>{const r=await POST(request({name:'Conta',category:'Outros',amount:100,dueDate:'2026-10-20',priority:'HIGH',recurrence:'NONE',status:'PARTIAL'}));expect(r.status).toBe(400);expect(mocks.create).not.toHaveBeenCalled();});
  it('creates partial accounts with history',async()=>{const r=await POST(request({name:'Conta',category:'Outros',amount:100,dueDate:'2026-10-20',priority:'HIGH',recurrence:'NONE',status:'PARTIAL',paidAmount:25,paidAt:'2026-09-30'}));expect(r.status).toBe(201);expect(mocks.create.mock.calls[0][0].data).toMatchObject({paidAmount:25,status:'PARTIAL',events:{create:{amount:25}}});});
+});
+
+describe('recurring payment creation',()=>{
+ it('creates all dates but only the first payment history',async()=>{
+ const r=await POST(request({name:'Mensalidade',category:'Outros',amount:100,dueDate:'2026-01-31',priority:'HIGH',recurrence:'MONTHLY',occurrences:3,status:'PAID',paidAt:'2026-01-31'}));expect(r.status).toBe(201);expect(mocks.create).toHaveBeenCalledTimes(3);
+ const rows=mocks.create.mock.calls.map(([arg])=>arg.data);expect(rows.map(r=>r.dueDate.toISOString().slice(0,10))).toEqual(['2026-01-31','2026-02-28','2026-03-31']);expect(rows[0].paidAmount).toBe(100);expect(rows[1]).toMatchObject({status:'PENDING',paidAmount:0,paidAt:null});expect(rows[1].events).toBeUndefined();expect(rows[2].events).toBeUndefined();
+ });
+ it('rejects invalid recurrence before creating anything',async()=>{const r=await POST(request({name:'Conta',category:'Outros',amount:100,dueDate:'2026-10-20',priority:'HIGH',recurrence:'MONTHLY',occurrences:3,recurrenceEnd:'2026-10-19',status:'PENDING'}));expect(r.status).toBe(400);expect(mocks.create).not.toHaveBeenCalled();});
 });

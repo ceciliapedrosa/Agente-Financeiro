@@ -8,6 +8,8 @@ import PaymentForm from "@/components/PaymentForm";
 import PaymentAction from "@/components/PaymentAction";
 import PeriodPicker from "@/components/PeriodPicker";
 import StatusBadge from "@/components/StatusBadge";
+import DueBadge from "@/components/DueBadge";
+import { urgency } from "@/lib/urgency";
 const dateFormat = new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" });
 export default async function Page({
   searchParams,
@@ -21,30 +23,33 @@ export default async function Page({
   const query = await searchParams;
   const period = monthPeriod(query.month);
   const status = query.status ?? "ALL";
+  const urgentFilter = ["OVERDUE", "TODAY", "UPCOMING"].includes(status);
+  const today = todayISO();
+  const end = new Date(today + "T23:59:59Z");
+  end.setUTCDate(end.getUTCDate() + 7);
   const all = await db.payment.findMany({
-    where: { userId, dueDate: { gte: period.start, lt: period.end } },
+    where: {
+      userId,
+      ...(urgentFilter
+        ? { status: { not: "PAID" as const }, dueDate: { lte: end } }
+        : { dueDate: { gte: period.start, lt: period.end } }),
+    },
     orderBy: { dueDate: "asc" },
     include: { events: { orderBy: { createdAt: "asc" } } },
   });
-  const today = todayISO();
-  const end = new Date(today + "T12:00:00Z");
-  end.setUTCDate(end.getUTCDate() + 7);
   const payments = all.filter((p) =>
-    status === "PENDING"
-      ? remaining(p) > 0
-      : status === "UPCOMING"
-        ? remaining(p) > 0 &&
-          p.dueDate.toISOString().slice(0, 10) >= today &&
-          p.dueDate <= end
-        : status === "OVERDUE"
-          ? remaining(p) > 0 && p.dueDate.toISOString().slice(0, 10) < today
-          : status === "PAID" || status === "PARTIAL"
-            ? p.status === status
-            : true,
+    urgentFilter
+      ? urgency(p, today) === status
+      : status === "PENDING"
+        ? remaining(p) > 0
+        : status === "PAID" || status === "PARTIAL"
+          ? p.status === status
+          : true,
   );
   const tabs = [
     ["ALL", "Todos"],
     ["PENDING", "A pagar"],
+    ["TODAY", "Vencem hoje"],
     ["UPCOMING", "Próximos 7 dias"],
     ["OVERDUE", "Atrasados"],
     ["PAID", "Pagos"],
@@ -58,13 +63,20 @@ export default async function Page({
             <span className="kicker">CONTROLE</span>
             <h1>Pagamentos</h1>
             <p>
-              Contas com vencimento em {period.label}. Abra o nome para ver
-              detalhes.
+              {urgentFilter
+                ? "Vencimentos em relação a hoje, incluindo outros meses. O filtro de mês não limita esta lista."
+                : `Contas com vencimento em ${period.label}. Abra o nome para ver detalhes.`}
             </p>
           </div>
           <PaymentForm />
         </div>
-        <PeriodPicker action="/pagamentos" month={period.key} status={status} />
+        {!urgentFilter && (
+          <PeriodPicker
+            action="/pagamentos"
+            month={period.key}
+            status={status}
+          />
+        )}
         <div className="tabs">
           {tabs.map(([key, label]) => (
             <a
@@ -141,7 +153,10 @@ export default async function Page({
                         )}
                       </details>
                     </td>
-                    <td>{dateFormat.format(p.dueDate)}</td>
+                    <td>
+                      {dateFormat.format(p.dueDate)}
+                      <DueBadge payment={p} />
+                    </td>
                     <td>
                       <b>{brl.format(p.amount)}</b>
                       <small>Pago: {brl.format(paidValue(p))}</small>

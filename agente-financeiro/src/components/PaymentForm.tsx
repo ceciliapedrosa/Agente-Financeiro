@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import Modal from "./Modal";
+import RecurrenceFields from "./RecurrenceFields";
 import { todayISO } from "@/lib/finance";
 export type EditablePayment = {
   id: string;
@@ -24,6 +25,7 @@ export default function PaymentForm({
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [status, setStatus] = useState("PENDING");
+  const [firstDate, setFirstDate] = useState(payment?.dueDate ?? "");
   const router = useRouter();
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -61,6 +63,7 @@ export default function PaymentForm({
         onClick={() => {
           setError("");
           setStatus("PENDING");
+          setFirstDate(payment?.dueDate ?? "");
           setOpen(true);
         }}
       >
@@ -106,7 +109,8 @@ export default function PaymentForm({
               <input
                 name="dueDate"
                 type="date"
-                defaultValue={payment?.dueDate}
+                value={firstDate}
+                onChange={(e) => setFirstDate(e.target.value)}
                 required
               />
             </label>
@@ -142,17 +146,21 @@ export default function PaymentForm({
                 <option value="LOW">Baixa</option>
               </select>
             </label>
-            <label>
-              Recorrência
-              <select
-                name="recurrence"
-                defaultValue={payment?.recurrence ?? "NONE"}
-              >
-                <option value="NONE">Não recorrente</option>
-                <option value="MONTHLY">Mensal</option>
-                <option value="YEARLY">Anual</option>
-              </select>
-            </label>
+            {payment ? (
+              <>
+                <input
+                  type="hidden"
+                  name="recurrence"
+                  value={payment.recurrence}
+                />
+                <p className="span2 field-hint">
+                  A edição afeta somente este lançamento. Para criar novas
+                  ocorrências, use “Nova conta”.
+                </p>
+              </>
+            ) : (
+              <RecurrenceFields start={firstDate} />
+            )}
             {!payment && (
               <label>
                 Status
@@ -207,6 +215,7 @@ export default function PaymentForm({
             <div className="modal-actions span2">
               <button
                 type="button"
+                data-modal-close
                 className="btn secondary"
                 disabled={busy}
                 onClick={() => setOpen(false)}
