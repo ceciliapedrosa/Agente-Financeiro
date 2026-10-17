@@ -1,15 +1,20 @@
 "use client";
 import { useState } from "react";
 import Modal from "./Modal";
+import { TextInput, MoneyInput, DateInput } from "./FormInputs";
 import RecurrenceFields from "./RecurrenceFields";
 import { useRouter } from "next/navigation";
+import { todayISO } from "@/lib/finance";
 import { Plus } from "lucide-react";
 
 export default function ReceiptForm({
   initialDate = "",
+  buttonLabel = "Nova receita",
 }: {
   initialDate?: string;
+  buttonLabel?: string;
 }) {
+  const [status, setStatus] = useState("PENDING");
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -47,11 +52,12 @@ export default function ReceiptForm({
         className="btn primary"
         onClick={() => {
           setFirstDate(initialDate);
+          setStatus("PENDING");
           setError("");
           setOpen(true);
         }}
       >
-        <Plus size={17} /> Nova receita
+        <Plus size={17} /> {buttonLabel}
       </button>
       {open && (
         <Modal
@@ -63,26 +69,18 @@ export default function ReceiptForm({
           <form className="grid-form" onSubmit={submit}>
             <label className="span2">
               Descrição
-              <input name="name" placeholder="Ex.: Salário" required />
+              <TextInput name="name" placeholder="Ex.: Salário" required />
             </label>
             <label>
               Valor
-              <input
-                name="amount"
-                type="number"
-                step="0.01"
-                min="0.01"
-                required
-              />
+              <MoneyInput name="amount" />
             </label>
             <label>
               Data prevista
-              <input
+              <DateInput
                 name="expectedAt"
-                type="date"
                 value={firstDate}
-                onChange={(e) => setFirstDate(e.target.value)}
-                required
+                onChange={setFirstDate}
               />
             </label>
             <label>
@@ -98,11 +96,25 @@ export default function ReceiptForm({
             </label>
             <label>
               Status
-              <select name="status">
+              <select
+                name="status"
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+              >
                 <option value="PENDING">Prevista</option>
                 <option value="RECEIVED">Recebida</option>
               </select>
             </label>
+            {status === "RECEIVED" && (
+              <label>
+                Data efetiva do recebimento
+                <DateInput
+                  name="receivedAt"
+                  defaultValue={todayISO()}
+                  max={todayISO()}
+                />
+              </label>
+            )}
             <RecurrenceFields start={firstDate} />
             {error && (
               <div role="alert" className="form-error span2">

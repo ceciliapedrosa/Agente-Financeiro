@@ -1,3 +1,4 @@
+import { MonthInput } from "./FormInputs";
 export default function PeriodPicker({
   month,
   action,
@@ -9,17 +10,9 @@ export default function PeriodPicker({
 }) {
   return (
     <form action={action} className="period-picker">
-      <label htmlFor="period">
+      <label>
         Período
-        <input
-          id="period"
-          name="month"
-          type="month"
-          defaultValue={month}
-          min="1900-01"
-          max="9998-12"
-          required
-        />
+        <MonthInput month={month} />
       </label>
       {status && <input type="hidden" name="status" value={status} />}
       <button className="btn secondary">Aplicar</button>

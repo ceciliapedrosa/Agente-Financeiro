@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import Modal from "./Modal";
+import { TextInput, MoneyInput } from "./FormInputs";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 
@@ -48,36 +49,27 @@ export default function CardForm() {
           <form className="grid-form" onSubmit={submit}>
             <label>
               Nome do cartão
-              <input name="name" placeholder="Ex.: Nubank" required />
+              <TextInput name="name" placeholder="Ex.: Nubank" required />
             </label>
             <label>
               Instituição
-              <input name="institution" placeholder="Ex.: Nubank" required />
+              <TextInput
+                name="institution"
+                placeholder="Ex.: Nubank"
+                required
+              />
             </label>
             <label>
               Limite
-              <input
-                name="creditLimit"
-                type="number"
-                min="0"
-                step="0.01"
-                required
-              />
+              <MoneyInput name="creditLimit" min={0} />
             </label>
             <label>
               Fatura atual
-              <input
-                name="currentInvoice"
-                type="number"
-                min="0"
-                step="0.01"
-                defaultValue="0"
-                required
-              />
+              <MoneyInput name="currentInvoice" defaultValue={0} min={0} />
             </label>
             <label>
               Dia de fechamento
-              <input
+              <TextInput
                 name="closingDay"
                 type="number"
                 min="1"
@@ -87,7 +79,13 @@ export default function CardForm() {
             </label>
             <label>
               Dia de vencimento
-              <input name="dueDay" type="number" min="1" max="31" required />
+              <TextInput
+                name="dueDay"
+                type="number"
+                min="1"
+                max="31"
+                required
+              />
             </label>
             {error && (
               <div role="alert" className="form-error span2">

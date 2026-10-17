@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import Modal from "./Modal";
+import { TextInput, MoneyInput, DateInput } from "./FormInputs";
 import RecurrenceFields from "./RecurrenceFields";
 import { todayISO } from "@/lib/finance";
 export type EditablePayment = {
@@ -18,8 +19,10 @@ export type EditablePayment = {
 };
 export default function PaymentForm({
   payment,
+  buttonLabel = "Nova conta",
 }: {
   payment?: EditablePayment;
+  buttonLabel?: string;
 }) {
   const [open, setOpen] = useState(false),
     [busy, setBusy] = useState(false),
@@ -68,7 +71,7 @@ export default function PaymentForm({
         }}
       >
         {!payment && <Plus size={17} />}{" "}
-        {payment ? "Editar conta" : "Nova conta"}
+        {payment ? "Editar conta" : buttonLabel}
       </button>
       {open && (
         <Modal
@@ -84,7 +87,7 @@ export default function PaymentForm({
           <form className="grid-form" onSubmit={submit}>
             <label className="span2">
               Nome da conta
-              <input
+              <TextInput
                 name="name"
                 defaultValue={payment?.name}
                 placeholder="Ex.: Aluguel"
@@ -94,24 +97,14 @@ export default function PaymentForm({
             </label>
             <label>
               Valor (R$)
-              <input
-                name="amount"
-                type="number"
-                step="0.01"
-                min="0.01"
-                max="999999999"
-                defaultValue={payment?.amount}
-                required
-              />
+              <MoneyInput name="amount" defaultValue={payment?.amount} />
             </label>
             <label>
               Vencimento
-              <input
+              <DateInput
                 name="dueDate"
-                type="date"
                 value={firstDate}
-                onChange={(e) => setFirstDate(e.target.value)}
-                required
+                onChange={setFirstDate}
               />
             </label>
             <label>
@@ -178,24 +171,16 @@ export default function PaymentForm({
             {!payment && status === "PARTIAL" && (
               <label>
                 Valor já pago (R$)
-                <input
-                  name="paidAmount"
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  required
-                />
+                <MoneyInput name="paidAmount" />
               </label>
             )}
             {!payment && status !== "PENDING" && (
               <label>
                 Data do pagamento
-                <input
+                <DateInput
                   name="paidAt"
-                  type="date"
                   defaultValue={todayISO()}
                   max={todayISO()}
-                  required
                 />
               </label>
             )}
