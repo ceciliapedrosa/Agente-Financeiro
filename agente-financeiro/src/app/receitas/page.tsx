@@ -4,7 +4,10 @@ import { getSessionUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import AppShell from "@/components/AppShell";
 import ReceiptForm from "@/components/ReceiptForm";
-import ReceiptAction from "@/components/ReceiptAction";
+import RecordManager from "@/components/RecordManager";
+import { managedProps } from "@/lib/managed-props";
+import { overdueDays } from "@/lib/manage-rules";
+import { todayISO } from "@/lib/finance";
 import EmptyState from "@/components/EmptyState";
 import FinancialFilters from "@/components/FinancialFilters";
 import { brl } from "@/lib/format";
@@ -36,13 +39,20 @@ export default async function Page({
     )
       ? query.sort!
       : "date_asc";
-  const status = ["PENDING", "RECEIVED"].includes(query.status ?? "")
+  const status = [
+    "PENDING",
+    "RECEIVED",
+    "OVERDUE",
+    "UPCOMING",
+    "CANCELLED",
+  ].includes(query.status ?? "")
     ? query.status!
     : "ALL";
   const [all, categoryRows] = await Promise.all([
     db.receipt.findMany({
       where: {
         userId,
+        cancelledAt: status === "CANCELLED" ? { not: null } : null,
         ...(month === "all"
           ? {}
           : { expectedAt: { gte: period.start, lt: period.end } }),
@@ -56,11 +66,18 @@ export default async function Page({
   ]);
   const rs = filterFinancialRows(
     all.filter((r) =>
-      status === "PENDING"
-        ? !r.receivedAt
-        : status === "RECEIVED"
-          ? !!r.receivedAt
-          : true,
+      status === "OVERDUE"
+        ? !r.receivedAt && overdueDays(r.expectedAt, todayISO()) > 0
+        : status === "UPCOMING"
+          ? !r.receivedAt &&
+            r.expectedAt.toISOString().slice(0, 10) >= todayISO() &&
+            r.expectedAt.getTime() <=
+              new Date(todayISO() + "T23:59:59Z").getTime() + 7 * 86400000
+          : status === "PENDING"
+            ? !r.receivedAt
+            : status === "RECEIVED"
+              ? !!r.receivedAt
+              : true,
     ),
     q,
     category,
@@ -84,6 +101,12 @@ export default async function Page({
           </div>
           <ReceiptForm />
         </div>
+        {status === "CANCELLED" && (
+          <p className="period-note">
+            Valores cancelados abaixo são apenas para consulta e restauração.
+            Não entram nos totais do painel.
+          </p>
+        )}
         <FinancialFilters
           key={JSON.stringify(query)}
           action="/receitas"
@@ -173,10 +196,20 @@ export default async function Page({
                       </td>
                       <td>{r.recurring ? "Recorrente" : "Única"}</td>
                       <td>
-                        <ReceiptAction
-                          id={r.id}
-                          name={r.name}
-                          receivedAt={r.receivedAt?.toISOString() ?? null}
+                        <span
+                          className={`status ${r.cancelledAt ? "pending" : r.receivedAt ? "paid" : overdueDays(r.expectedAt, todayISO()) > 0 ? "overdue" : "pending"}`}
+                        >
+                          {r.cancelledAt
+                            ? "Cancelada"
+                            : r.receivedAt
+                              ? "Recebida"
+                              : overdueDays(r.expectedAt, todayISO()) > 0
+                                ? `Atrasada há ${overdueDays(r.expectedAt, todayISO())} dia(s)`
+                                : "Prevista"}
+                        </span>
+                        <RecordManager
+                          kind="RECEIPT"
+                          record={managedProps(r)}
                         />
                       </td>
                     </tr>

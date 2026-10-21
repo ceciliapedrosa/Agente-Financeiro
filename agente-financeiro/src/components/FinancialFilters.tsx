@@ -72,6 +72,9 @@ export default function FinancialFilters({
             <option value="ALL">Todos</option>
             <option value="PENDING">Previstas</option>
             <option value="RECEIVED">Recebidas</option>
+            <option value="OVERDUE">Atrasadas</option>
+            <option value="UPCOMING">Hoje e próximos 7 dias</option>
+            <option value="CANCELLED">Canceladas</option>
           </select>
         </label>
       ) : (

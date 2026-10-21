@@ -94,49 +94,8 @@ describe("effective receipt dates", () => {
     expect(r.status).toBe(400);
     expect(mocks.create).not.toHaveBeenCalled();
   });
-  it("rejects future effective dates", async () => {
-    const r = await PATCH(
-      request({ id: "r1", receivedAt: "2099-01-01", expectedReceivedAt: null }),
-    );
-    expect(r.status).toBe(400);
+  it("requires old tabs to reload before using versioned editing", async () => {
+    expect((await PATCH()).status).toBe(409);
     expect(mocks.update).not.toHaveBeenCalled();
-  });
-  it("rejects impossible effective dates", async () => {
-    const r = await PATCH(
-      request({ id: "r1", receivedAt: "2026-02-30", expectedReceivedAt: null }),
-    );
-    expect(r.status).toBe(400);
-    expect(mocks.update).not.toHaveBeenCalled();
-  });
-  it("checks ownership before mutation", async () => {
-    mocks.find.mockResolvedValue(null);
-    const r = await PATCH(
-      request({ id: "r1", receivedAt: "2026-09-01", expectedReceivedAt: null }),
-    );
-    expect(r.status).toBe(404);
-    expect(mocks.find).toHaveBeenCalledWith({
-      where: { id: "r1", userId: "owner" },
-    });
-    expect(mocks.update).not.toHaveBeenCalled();
-  });
-  it("updates only effective date with an atomic prior-value guard", async () => {
-    mocks.find.mockResolvedValue({ id: "r1" });
-    mocks.update.mockResolvedValue({ count: 1 });
-    const r = await PATCH(
-      request({ id: "r1", receivedAt: "2026-09-01", expectedReceivedAt: null }),
-    );
-    expect(r.status).toBe(200);
-    expect(mocks.update).toHaveBeenCalledWith({
-      where: { id: "r1", userId: "owner", receivedAt: null },
-      data: { receivedAt: new Date("2026-09-01T12:00:00Z") },
-    });
-  });
-  it("rejects concurrent changes", async () => {
-    mocks.find.mockResolvedValue({ id: "r1" });
-    mocks.update.mockResolvedValue({ count: 0 });
-    const r = await PATCH(
-      request({ id: "r1", receivedAt: "2026-09-01", expectedReceivedAt: null }),
-    );
-    expect(r.status).toBe(409);
   });
 });

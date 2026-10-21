@@ -39,13 +39,16 @@ export default async function Dashboard({
   const [payments, receipts, future, receivedTotal, recordedPayments, urgent] =
     await Promise.all([
       db.payment.findMany({
-        where: { userId, dueDate: range },
+        where: { userId, cancelledAt: null, dueDate: range },
         orderBy: { dueDate: "asc" },
       }),
-      db.receipt.findMany({ where: { userId, expectedAt: range } }),
+      db.receipt.findMany({
+        where: { userId, cancelledAt: null, expectedAt: range },
+      }),
       db.payment.findMany({
         where: {
           userId,
+          cancelledAt: null,
           dueDate: { gte: period.end },
           status: { not: "PAID" },
         },
@@ -53,22 +56,42 @@ export default async function Dashboard({
       db.receipt.aggregate({
         where: {
           userId,
+          cancelledAt: null,
           receivedAt: { lte: new Date(today + "T23:59:59.999Z") },
         },
         _sum: { amount: true },
       }),
       db.payment.findMany({
-        where: { userId, OR: [{ status: "PAID" }, { paidAmount: { gt: 0 } }] },
+        where: {
+          userId,
+          cancelledAt: null,
+          OR: [{ status: "PAID" }, { paidAmount: { gt: 0 } }],
+        },
       }),
       db.payment.findMany({
         where: {
           userId,
+          cancelledAt: null,
           status: { not: "PAID" },
           dueDate: { lte: attentionEnd },
         },
         orderBy: { dueDate: "asc" },
       }),
     ]);
+  const [expectedReceipts, unreviewedCards] = await Promise.all([
+    db.receipt.findMany({
+      where: {
+        userId,
+        cancelledAt: null,
+        receivedAt: null,
+        expectedAt: { lte: attentionEnd },
+      },
+      orderBy: { expectedAt: "asc" },
+    }),
+    db.card.count({
+      where: { userId, invoiceReviewedAt: null, currentInvoice: { gt: 0 } },
+    }),
+  ]);
   const realized =
     (cents(receivedTotal._sum.amount ?? 0) -
       recordedPayments.reduce((sum, p) => sum + cents(paidValue(p)), 0)) /
@@ -120,6 +143,21 @@ export default async function Dashboard({
           </div>
           <strong>{brl.format(realized)}</strong>
         </section>
+        {unreviewedCards > 0 && (
+          <section className="panel guidance-card">
+            <div>
+              <h2>Confirme as faturas dos seus cartões</h2>
+              <p>
+                {unreviewedCards} cartão(ões) têm valores antigos sem
+                competência e situação definidas. Esses valores ainda não entram
+                como faturas confirmadas no planejamento.
+              </p>
+              <Link className="text-link" href="/cartoes">
+                Revisar faturas →
+              </Link>
+            </div>
+          </section>
+        )}
         <PeriodPicker action="/dashboard" month={period.key} />
         {summary.income === 0 && (
           <section className="panel guidance-card">
@@ -168,6 +206,45 @@ export default async function Dashboard({
           O saldo previsto não é seu saldo bancário. Compromissos após este mês:{" "}
           <b>{brl.format(future.reduce((s, p) => s + remaining(p), 0))}</b>.
         </p>
+        <section className="panel attention-panel">
+          <div className="panel-head">
+            <div>
+              <h2>Recebimentos para acompanhar</h2>
+              <p>
+                Atrasos de todos os meses e entradas esperadas para hoje e os
+                próximos 7 dias.
+              </p>
+            </div>
+          </div>
+          <div className="attention-grid">
+            {["OVERDUE", "UPCOMING"].map((kind) => {
+              const group = expectedReceipts.filter((r) =>
+                kind === "OVERDUE"
+                  ? r.expectedAt.toISOString().slice(0, 10) < today
+                  : r.expectedAt.toISOString().slice(0, 10) >= today,
+              );
+              return (
+                <Link
+                  key={kind}
+                  className={`attention-card attention-${kind.toLowerCase()}`}
+                  href={`/receitas?month=all&status=${kind}`}
+                >
+                  <span>
+                    {kind === "OVERDUE"
+                      ? "Receitas atrasadas"
+                      : "Receitas previstas · hoje e próximos 7 dias"}
+                  </span>
+                  <strong>
+                    {brl.format(
+                      group.reduce((s, r) => s + cents(r.amount), 0) / 100,
+                    )}
+                  </strong>
+                  <small>{group.length} entrada(s) · ver detalhes →</small>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
         <section className="panel attention-panel">
           <div className="panel-head">
             <div>

@@ -22,10 +22,18 @@ export default async function Page({
   chartStart.setUTCMonth(chartStart.getUTCMonth() - 5);
   const [historyPayments, historyReceipts] = await Promise.all([
     db.payment.findMany({
-      where: { userId, dueDate: { gte: chartStart, lt: period.end } },
+      where: {
+        userId,
+        cancelledAt: null,
+        dueDate: { gte: chartStart, lt: period.end },
+      },
     }),
     db.receipt.findMany({
-      where: { userId, expectedAt: { gte: chartStart, lt: period.end } },
+      where: {
+        userId,
+        cancelledAt: null,
+        expectedAt: { gte: chartStart, lt: period.end },
+      },
     }),
   ]);
   const payments = historyPayments.filter((p) => p.dueDate >= period.start),

@@ -19,7 +19,7 @@ export type EditablePayment = {
 };
 export default function PaymentForm({
   payment,
-  buttonLabel = "Nova conta",
+  buttonLabel,
 }: {
   payment?: EditablePayment;
   buttonLabel?: string;
@@ -71,7 +71,7 @@ export default function PaymentForm({
         }}
       >
         {!payment && <Plus size={17} />}{" "}
-        {payment ? "Editar conta" : buttonLabel}
+        {buttonLabel ?? (payment ? "Editar conta" : "Nova conta")}
       </button>
       {open && (
         <Modal

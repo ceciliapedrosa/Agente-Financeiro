@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
@@ -112,6 +113,8 @@ export async function POST(req: Request) {
     }
     const data: Prisma.PaymentUncheckedCreateInput = {
       userId,
+      seriesId: dates.length > 1 ? randomUUID() : null,
+      seriesIndex: 0,
       name: d.name,
       category: d.category,
       amount: money(d.amount),
@@ -144,6 +147,7 @@ export async function POST(req: Request) {
                 const item = await tx.payment.create({
                   data: {
                     ...data,
+                    seriesIndex: i,
                     dueDate: asDate(dates[i]),
                     ...(i
                       ? {
@@ -173,6 +177,7 @@ export async function PATCH(req: Request) {
   try {
     const d = change.parse(await req.json());
     const result = await db.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId}))`;
       // Serialize mutations to prevent double clicks and concurrent tabs overpaying.
       await tx.$queryRaw`SELECT id FROM "Payment" WHERE id = ${d.id} AND "userId" = ${userId} FOR UPDATE`;
       const p = await tx.payment.findFirst({
@@ -185,6 +190,8 @@ export async function PATCH(req: Request) {
           "Esta conta foi alterada em outra sessão. Atualize a página antes de continuar.",
           409,
         );
+      if (p.cancelledAt)
+        throw new RequestError("Restaure a conta antes de alterá-la.");
       const previous = paidValue(p);
       const updatedAt = new Date(
         Math.max(Date.now(), p.updatedAt.getTime() + 1),
@@ -243,10 +250,21 @@ export async function PATCH(req: Request) {
         });
         data = { paidAmount: total, paidAt: total ? paidAt : null, status };
       }
-      return tx.payment.update({
+      const after = await tx.payment.update({
         where: { id: p.id },
         data: { ...data, updatedAt },
       });
+      await tx.recordHistory.create({
+        data: {
+          userId,
+          recordId: p.id,
+          kind: "PAYMENT",
+          action: d.action,
+          before: JSON.parse(JSON.stringify(p)),
+          after: JSON.parse(JSON.stringify(after)),
+        },
+      });
+      return after;
     });
     return NextResponse.json(result);
   } catch (error) {

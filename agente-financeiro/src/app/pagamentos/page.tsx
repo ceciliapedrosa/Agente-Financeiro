@@ -1,3 +1,5 @@
+import RecordManager from "@/components/RecordManager";
+import { managedProps } from "@/lib/managed-props";
 import { redirect } from "next/navigation";
 import { getSessionUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -33,6 +35,7 @@ export default async function Page({
   const query = await searchParams;
   const period = monthPeriod(query.month);
   const status = [
+    "CANCELLED",
     "ALL",
     "PENDING",
     "PAID",
@@ -66,6 +69,7 @@ export default async function Page({
   const all = await db.payment.findMany({
     where: {
       userId,
+      cancelledAt: status === "CANCELLED" ? { not: null } : null,
       ...(urgentFilter
         ? { status: { not: "PAID" as const }, dueDate: { lte: end } }
         : month === "all"
@@ -103,6 +107,7 @@ export default async function Page({
     ["OVERDUE", "Atrasados"],
     ["PAID", "Pagos"],
     ["PARTIAL", "Parciais"],
+    ["CANCELLED", "Cancelados"],
   ];
   return (
     <AppShell active="/pagamentos" userName={user.name}>
@@ -121,6 +126,12 @@ export default async function Page({
           </div>
           <PaymentForm />
         </div>
+        {status === "CANCELLED" && (
+          <p className="period-note">
+            Valores cancelados são apenas para consulta e restauração. Não
+            entram nos totais do painel.
+          </p>
+        )}
         <FinancialFilters
           key={JSON.stringify(query)}
           action="/pagamentos"
@@ -215,7 +226,7 @@ export default async function Page({
                     </td>
                     <td>
                       {dateFormat.format(p.dueDate)}
-                      <DueBadge payment={p} />
+                      {!p.cancelledAt && <DueBadge payment={p} />}
                     </td>
                     <td>
                       <b>{brl.format(p.amount)}</b>
@@ -223,28 +234,41 @@ export default async function Page({
                       <small>Restante: {brl.format(remaining(p))}</small>
                     </td>
                     <td>
-                      <StatusBadge status={p.status} />
+                      {p.cancelledAt ? (
+                        <span className="status pending">Cancelada</span>
+                      ) : (
+                        <StatusBadge status={p.status} />
+                      )}
                     </td>
                     <td>
                       <div className="row-actions">
-                        <PaymentForm
-                          payment={{
-                            id: p.id,
-                            name: p.name,
-                            amount: p.amount,
-                            dueDate: p.dueDate.toISOString().slice(0, 10),
-                            category: p.category,
-                            priority: p.priority,
-                            recurrence: p.recurrence,
-                            notes: p.notes,
-                            updatedAt: p.updatedAt.toISOString(),
-                          }}
-                        />
-                        <PaymentAction
-                          id={p.id}
-                          updatedAt={p.updatedAt.toISOString()}
-                          remaining={remaining(p)}
-                          paid={paidValue(p)}
+                        {!p.cancelledAt && (
+                          <PaymentForm
+                            buttonLabel="Prioridade e observações"
+                            payment={{
+                              id: p.id,
+                              name: p.name,
+                              amount: p.amount,
+                              dueDate: p.dueDate.toISOString().slice(0, 10),
+                              category: p.category,
+                              priority: p.priority,
+                              recurrence: p.recurrence,
+                              notes: p.notes,
+                              updatedAt: p.updatedAt.toISOString(),
+                            }}
+                          />
+                        )}
+                        {!p.cancelledAt && (
+                          <PaymentAction
+                            id={p.id}
+                            updatedAt={p.updatedAt.toISOString()}
+                            remaining={remaining(p)}
+                            paid={paidValue(p)}
+                          />
+                        )}
+                        <RecordManager
+                          kind="PAYMENT"
+                          record={managedProps(p)}
                         />
                       </div>
                     </td>
