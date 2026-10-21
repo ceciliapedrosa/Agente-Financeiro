@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks=vi.hoisted(()=>({session:vi.fn(),find:vi.fn(),update:vi.fn(),create:vi.fn(),event:vi.fn(),lock:vi.fn()}));
 vi.mock('@/lib/auth',()=>({getSessionUserId:mocks.session}));
-vi.mock('@/lib/db',()=>({db:{payment:{create:mocks.create},$transaction:async(fn:Function)=>fn({$queryRaw:mocks.lock,payment:{create:mocks.create,findFirst:mocks.find,update:mocks.update},paymentEvent:{create:mocks.event}})}}));
+vi.mock('@/lib/db',()=>({db:{payment:{create:mocks.create},$transaction:async(fn:Function)=>fn({$queryRaw:mocks.lock,$executeRaw:mocks.lock,payment:{create:mocks.create,findFirst:mocks.find,update:mocks.update},paymentEvent:{create:mocks.event},recordHistory:{create:vi.fn()}})}}));
 import { POST, PATCH } from '../src/app/api/payments/route';
 const timestamp='2026-09-30T12:00:00.000Z';
 const base={id:'account',userId:'owner',amount:100,paidAmount:30,status:'PARTIAL',paidAt:new Date(timestamp),updatedAt:new Date(timestamp),events:[{amount:30}]};

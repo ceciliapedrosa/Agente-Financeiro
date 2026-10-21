@@ -42,7 +42,7 @@ export default function CardForm() {
       {open && (
         <Modal
           title="Novo cartão"
-          description="Cadastre limite, fatura e datas principais."
+          description="Cadastre o cartão. Depois, confirme a competência e a situação de cada fatura."
           onClose={() => setOpen(false)}
           busy={busy}
         >
@@ -64,7 +64,7 @@ export default function CardForm() {
               <MoneyInput name="creditLimit" min={0} />
             </label>
             <label>
-              Fatura atual
+              Valor de fatura a confirmar (opcional)
               <MoneyInput name="currentInvoice" defaultValue={0} min={0} />
             </label>
             <label>

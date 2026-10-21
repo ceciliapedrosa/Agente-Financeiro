@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
@@ -56,6 +57,8 @@ export async function POST(req: Request) {
     }
     const data = {
       userId,
+      seriesId: dates.length > 1 ? randomUUID() : null,
+      seriesIndex: 0,
       name: d.name,
       category: d.category,
       amount: Math.round(d.amount * 100) / 100,
@@ -73,6 +76,7 @@ export async function POST(req: Request) {
                 const item = await tx.receipt.create({
                   data: {
                     ...data,
+                    seriesIndex: i,
                     expectedAt: calendarDate(dates[i]),
                     receivedAt: i ? null : data.receivedAt,
                   },
@@ -97,68 +101,13 @@ export async function POST(req: Request) {
   }
 }
 
-const updateSchema = z.object({
-  id: z.string().min(1),
-  receivedAt: z.string(),
-  expectedReceivedAt: z.string().datetime().nullable(),
-});
-export async function PATCH(req: Request) {
-  const userId = await getSessionUserId();
-  if (!userId)
-    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-  try {
-    const d = updateSchema.parse(await req.json());
-    let receivedAt: Date;
-    try {
-      receivedAt = calendarDate(d.receivedAt);
-      if (d.receivedAt > todayISO()) throw new Error();
-    } catch {
-      return NextResponse.json(
-        { error: "Informe uma data efetiva de recebimento válida, até hoje." },
-        { status: 400 },
-      );
-    }
-    const existing = await db.receipt.findFirst({
-      where: { id: d.id, userId },
-    });
-    if (!existing)
-      return NextResponse.json(
-        { error: "Receita não encontrada." },
-        { status: 404 },
-      );
-    const changed = await db.receipt.updateMany({
-      where: {
-        id: d.id,
-        userId,
-        receivedAt: d.expectedReceivedAt
-          ? new Date(d.expectedReceivedAt)
-          : null,
-      },
-      data: { receivedAt },
-    });
-    if (!changed.count)
-      return NextResponse.json(
-        {
-          error:
-            "Este recebimento foi alterado em outra sessão. Atualize a página.",
-        },
-        { status: 409 },
-      );
-    return NextResponse.json({ ok: true });
-  } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof z.ZodError || error instanceof SyntaxError
-            ? "Confira os dados do recebimento."
-            : "Não foi possível salvar o recebimento.",
-      },
-      {
-        status:
-          error instanceof z.ZodError || error instanceof SyntaxError
-            ? 400
-            : 500,
-      },
-    );
-  }
+// Old tabs must reload before using the new versioned editing flow.
+export async function PATCH() {
+  return NextResponse.json(
+    {
+      error:
+        "O controle de receitas foi atualizado. Recarregue a página para continuar.",
+    },
+    { status: 409 },
+  );
 }
