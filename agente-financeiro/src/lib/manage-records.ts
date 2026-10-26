@@ -44,6 +44,8 @@ const schema = z.object({
   scope: z.enum(["ONE", "FUTURE", "ALL"]).default("ONE"),
   name: z.string().optional(),
   category: z.string().optional(),
+  priority: z.enum(["ESSENTIAL", "HIGH", "MEDIUM", "LOW"]).optional(),
+  notes: z.string().trim().max(2000).optional(),
   amount: z.coerce.number().optional(),
   date: z.string().optional(),
   institution: z.string().optional(),
@@ -295,6 +297,8 @@ export async function changeRecord(
           throw new Failure(
             "O valor não pode ser menor que o já pago. Estorne o pagamento antes.",
           );
+        if (d.priority !== undefined) patch.priority = d.priority;
+        if (d.notes !== undefined) patch.notes = d.notes || null;
         patch.status = paymentState(edit.amount, paid);
         patch.paidAmount = paid;
       }

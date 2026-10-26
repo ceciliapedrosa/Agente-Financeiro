@@ -110,7 +110,7 @@ export default async function Page({
     ["CANCELLED", "Cancelados"],
   ];
   return (
-    <AppShell active="/pagamentos" userName={user.name}>
+    <AppShell active="/pagamentos" userName={user.name} month={month}>
       <main className="page">
         <div className="page-head">
           <div>
@@ -161,7 +161,7 @@ export default async function Page({
         </p>
         <section className="panel">
           <div className="table-wrap">
-            <table>
+            <table className="mobile-records">
               <thead>
                 <tr>
                   <th>Conta e detalhes</th>
@@ -174,7 +174,7 @@ export default async function Page({
               <tbody>
                 {payments.map((p) => (
                   <tr id={`conta-${p.id}`} key={p.id}>
-                    <td>
+                    <td data-label="Conta e detalhes">
                       <details className="payment-details">
                         <summary>{p.name}</summary>
                         <p>Categoria: {p.category}</p>
@@ -224,40 +224,24 @@ export default async function Page({
                         )}
                       </details>
                     </td>
-                    <td>
+                    <td data-label="Vencimento">
                       {dateFormat.format(p.dueDate)}
                       {!p.cancelledAt && <DueBadge payment={p} />}
                     </td>
-                    <td>
+                    <td data-label="Total / pago / restante">
                       <b>{brl.format(p.amount)}</b>
                       <small>Pago: {brl.format(paidValue(p))}</small>
                       <small>Restante: {brl.format(remaining(p))}</small>
                     </td>
-                    <td>
+                    <td data-label="Status">
                       {p.cancelledAt ? (
                         <span className="status pending">Cancelada</span>
                       ) : (
                         <StatusBadge status={p.status} />
                       )}
                     </td>
-                    <td>
+                    <td data-label="Ações">
                       <div className="row-actions">
-                        {!p.cancelledAt && (
-                          <PaymentForm
-                            buttonLabel="Prioridade e observações"
-                            payment={{
-                              id: p.id,
-                              name: p.name,
-                              amount: p.amount,
-                              dueDate: p.dueDate.toISOString().slice(0, 10),
-                              category: p.category,
-                              priority: p.priority,
-                              recurrence: p.recurrence,
-                              notes: p.notes,
-                              updatedAt: p.updatedAt.toISOString(),
-                            }}
-                          />
-                        )}
                         {!p.cancelledAt && (
                           <PaymentAction
                             id={p.id}

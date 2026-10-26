@@ -1,6 +1,7 @@
 "use client";
 import { useId, useState, type InputHTMLAttributes } from "react";
 import {
+  maskDateInput,
   parseBRMoney,
   formatBRMoney,
   parseBRDate,
@@ -129,7 +130,7 @@ export function DateInput({
         value={raw}
         required={required}
         onChange={(e) => {
-          const text = e.target.value,
+          const text = maskDateInput(e.target.value),
             next = parseBRDate(text);
           setRaw(text);
           onChange?.(next);
@@ -172,7 +173,7 @@ export function MonthInput({
         value={raw}
         required={!allowAll}
         onChange={(e) => {
-          const value = e.target.value,
+          const value = maskDateInput(e.target.value, true),
             m = /^(0[1-9]|1[0-2])\/(\d{4})$/.exec(value);
           setRaw(value);
           e.currentTarget.setCustomValidity(

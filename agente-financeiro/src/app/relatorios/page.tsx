@@ -61,7 +61,7 @@ export default async function Page({
   });
   const max = Math.max(1, ...data.flatMap((d) => [d.income, d.expenses]));
   return (
-    <AppShell active="/relatorios" userName={user.name}>
+    <AppShell active="/relatorios" userName={user.name} month={period.key}>
       <main className="page">
         <div className="page-head">
           <div>
@@ -145,7 +145,7 @@ export default async function Page({
             ))}
           </div>
           <div className="table-wrap">
-            <table>
+            <table className="mobile-records">
               <caption className="table-caption">
                 Valores do comparativo mensal
               </caption>
@@ -161,9 +161,9 @@ export default async function Page({
                 {data.map((d) => (
                   <tr key={d.key}>
                     <th scope="row">{d.label}</th>
-                    <td>{brl.format(d.income)}</td>
-                    <td>{brl.format(d.expenses)}</td>
-                    <td>{brl.format(d.projected)}</td>
+                    <td data-label="Receitas previstas">{brl.format(d.income)}</td>
+                    <td data-label="Despesas">{brl.format(d.expenses)}</td>
+                    <td data-label="Saldo previsto">{brl.format(d.projected)}</td>
                   </tr>
                 ))}
               </tbody>

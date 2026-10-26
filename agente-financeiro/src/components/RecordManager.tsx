@@ -11,6 +11,8 @@ export type ManagedRecord = {
   updatedAt: string;
   amount?: number;
   category?: string;
+  priority?: string;
+  notes?: string | null;
   date?: string;
   receivedAt?: string | null;
   cancelledAt?: string | null;
@@ -67,6 +69,8 @@ const dateLabel = (s?: string | null) =>
 const fields: Record<string, string> = {
   name: "Nome",
   category: "Categoria",
+  priority: "Prioridade",
+  notes: "Observações",
   amount: "Valor",
   dueDate: "Vencimento",
   expectedAt: "Data prevista",
@@ -321,6 +325,12 @@ export default function RecordManager({
                         defaultValue={r.date?.slice(0, 10)}
                       />
                     </label>
+                    {kind === "PAYMENT" && <>
+                      <label>Prioridade<select name="priority" defaultValue={r.priority ?? "ESSENTIAL"}>
+                        <option value="ESSENTIAL">Essencial</option><option value="HIGH">Alta</option><option value="MEDIUM">Média</option><option value="LOW">Baixa</option>
+                      </select></label>
+                      <label className="span2">Observações<textarea name="notes" defaultValue={r.notes ?? ""} maxLength={2000}/></label>
+                    </>}
                     {r.receivedAt && (
                       <p className="span2">
                         Esta receita já foi recebida. Corrigir o valor também
@@ -340,7 +350,7 @@ export default function RecordManager({
             )}
             {action === "receive" && (
               <label className="span2">
-                Data efetiva do recebimento
+                Recebimento de {brl.format(r.amount ?? 0)} · data efetiva
                 <DateInput
                   name="date"
                   defaultValue={r.receivedAt?.slice(0, 10) ?? todayISO()}
@@ -535,7 +545,7 @@ export default function RecordManager({
                   className="btn primary"
                   disabled={busy || loading || (scope !== "ONE" && !version)}
                 >
-                  {busy ? "Salvando…" : "Confirmar alteração"}
+                  {busy ? "Salvando…" : action === "receive" ? `${r.receivedAt ? "Corrigir" : "Registrar"} recebimento de ${brl.format(r.amount ?? 0)}` : action === "edit" ? "Salvar alterações" : labels[action]}
                 </button>
               )}
             </div>

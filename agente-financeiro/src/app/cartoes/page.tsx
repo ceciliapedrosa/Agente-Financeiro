@@ -51,7 +51,7 @@ export default async function Page({
     query.archived === "1" ? !!c.archivedAt : !c.archivedAt,
   );
   return (
-    <AppShell active="/cartoes" userName={user.name}>
+    <AppShell active="/cartoes" userName={user.name} month={period.key}>
       <main className="page">
         <div className="page-head">
           <div>
