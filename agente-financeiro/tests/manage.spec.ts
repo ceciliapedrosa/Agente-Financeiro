@@ -87,6 +87,11 @@ beforeEach(() => {
   mocks.session.mockResolvedValue("owner");
 });
 describe("editing and recoverable lifecycle", () => {
+  it("edits priority and notes through the audited manager without losing partial payments", async () => {
+    await change({ kind: "PAYMENT", id: "p1", updatedAt: date.toISOString(), action: "edit", name: "Internet", category: "Casa", amount: 100, date: "2026-10-01", priority: "HIGH", notes: " Conferir boleto " });
+    expect(tx.payment.update.mock.calls[0][0].data).toMatchObject({ priority: "HIGH", notes: "Conferir boleto", paidAmount: 30, status: "PARTIAL" });
+    expect(tx.recordHistory.create).toHaveBeenCalled();
+  });
   it("checks authentication before writes", async () => {
     mocks.session.mockResolvedValue(null);
     expect(
