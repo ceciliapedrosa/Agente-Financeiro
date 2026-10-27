@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  maskDateInput,
   parseBRMoney,
   formatBRMoney,
   parseBRDate,
@@ -7,6 +8,15 @@ import {
 } from "../src/lib/input-format";
 import { filterFinancialRows } from "../src/lib/financial-search";
 describe("Brazilian financial input", () => {
+  it("accepts dates pasted or typed on a numeric keyboard without accepting impossible dates", () => {
+    expect(parseBRDate(maskDateInput("26102026"))).toBe("2026-10-26");
+    expect(maskDateInput("26/10/2026")).toBe("26/10/2026");
+    expect(maskDateInput("102026", true)).toBe("10/2026");
+    expect(maskDateInput("10/2026", true)).toBe("10/2026");
+    expect(parseBRDate(maskDateInput("31022026"))).toBe("");
+    expect(maskDateInput("26/1")).toBe("26/1");
+    expect(maskDateInput("")).toBe("");
+  });
   it("parses grouping and decimal separators without multiplying cents", () => {
     expect(parseBRMoney("R$ 1.600,00")).toBe(1600);
     expect(parseBRMoney("89,61")).toBe(89.61);

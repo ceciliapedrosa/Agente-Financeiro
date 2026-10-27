@@ -89,7 +89,7 @@ export default async function Page({
       rs.filter((r) => r.receivedAt).reduce((s, r) => s + cents(r.amount), 0) /
       100;
   return (
-    <AppShell active="/receitas" userName={user.name}>
+    <AppShell active="/receitas" userName={user.name} month={month}>
       <main className="page">
         <div className="page-head">
           <div>
@@ -167,7 +167,7 @@ export default async function Page({
             </EmptyState>
           ) : (
             <div className="table-wrap">
-              <table>
+              <table className="mobile-records">
                 <thead>
                   <tr>
                     <th>Receita</th>
@@ -181,21 +181,21 @@ export default async function Page({
                 <tbody>
                   {rs.map((r) => (
                     <tr key={r.id}>
-                      <td>
+                      <td data-label="Receita">
                         <b>{r.name}</b>
                         <small>{r.category}</small>
                       </td>
-                      <td>{dates.format(r.expectedAt)}</td>
-                      <td>
+                      <td data-label="Data prevista">{dates.format(r.expectedAt)}</td>
+                      <td data-label="Recebido em">
                         {r.receivedAt
                           ? dates.format(r.receivedAt)
                           : "Ainda não recebida"}
                       </td>
-                      <td>
+                      <td data-label="Valor">
                         <b>{brl.format(r.amount)}</b>
                       </td>
-                      <td>{r.recurring ? "Recorrente" : "Única"}</td>
-                      <td>
+                      <td data-label="Recorrência">{r.recurring ? "Recorrente" : "Única"}</td>
+                      <td data-label="Status e ações">
                         <span
                           className={`status ${r.cancelledAt ? "pending" : r.receivedAt ? "paid" : overdueDays(r.expectedAt, todayISO()) > 0 ? "overdue" : "pending"}`}
                         >

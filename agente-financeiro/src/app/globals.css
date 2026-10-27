@@ -247,3 +247,31 @@ summary:focus-visible {
 .managed-card{padding:0;overflow:hidden}.managed-card .credit-card-item{border-radius:0}.managed-card-body{padding:20px;display:grid;gap:16px}.invoice-detail{border-top:1px solid #ddd;padding-top:16px;display:grid;gap:12px}.row-actions{flex-wrap:wrap}.managed-card-body .row-actions{gap:10px}.status.overdue{background:#fff1f2;color:#9f1239}.accessible-modal ol{padding-left:24px}.accessible-modal li{margin-bottom:12px}
 
 .record-menu summary{cursor:pointer;font-weight:600;padding:8px 0}.record-menu[open] .row-actions{display:flex;flex-direction:column;align-items:flex-start;padding:8px 0;gap:10px}
+
+/* Mobile navigation, readable controls and self-contained financial records. */
+.mobile-nav{display:none}
+.extra-filters{grid-column:1/-1}.extra-filters summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weight:600}.extra-filter-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;padding-top:12px}
+.small-action,.record-menu>summary,.payment-details>summary{min-height:44px;font-size:13px;display:inline-flex;align-items:center;cursor:pointer}
+.icon-btn{min-width:44px;min-height:44px}
+.status.overdue{color:#8a1c13!important;background:#fff0ed!important}
+@media(max-width:760px){
+ .mobile-nav{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));position:fixed;bottom:0;left:0;right:0;z-index:40;background:#fff;border-top:1px solid #ddd;padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+ .mobile-nav a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-height:52px;color:#555;font-size:11px;text-decoration:none;border-radius:8px}
+ .mobile-nav a.active{background:#171717;color:#fff;font-weight:700}
+ .content{padding-bottom:calc(82px + env(safe-area-inset-bottom));min-width:0}
+ .mobile-header form{margin-left:auto}.mobile-header{padding:0 16px}
+ .page{min-width:0}.page-head,.quick-actions,.row-actions{flex-wrap:wrap}
+ .grid-form input,.grid-form select,.grid-form textarea,.filter-form input,.filter-form select,.period-picker input{font-size:16px;min-height:48px}
+ .extra-filter-fields{grid-template-columns:1fr}.filter-form{gap:12px}.filter-actions{grid-column:1/-1}
+ .small-action,.btn,.tab{min-height:44px}.status{font-size:12px}
+ .mobile-records{min-width:0;display:block}.mobile-records tbody{display:block;padding:12px}.mobile-records thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+ .mobile-records tr{display:block;border:1px solid #ddd;border-radius:12px;margin-bottom:12px;padding:12px;overflow-wrap:anywhere}
+ .mobile-records td{display:block;border:0;padding:7px 0;font-size:14px}.mobile-records td::before{content:attr(data-label);display:block;font-size:12px;font-weight:600;color:#666;margin-bottom:4px}
+ .mobile-records tbody th{display:block;background:transparent;border:0;padding:8px 0;font-size:15px}
+ .mobile-records .row-actions{gap:8px}.mobile-records .record-menu{width:100%}
+ .credit-card-item{min-height:0;padding:18px}.credit-card-meta{gap:10px}
+ .accessible-modal{max-width:calc(100vw - 16px);max-height:calc(100dvh - 16px);padding:16px}
+ .modal-actions{position:sticky;bottom:-16px;background:#fff;padding:12px 0;margin-bottom:0;border-top:1px solid #eee;flex-wrap:wrap}.modal-actions .btn{white-space:normal;flex:1;min-width:120px}
+ .period-picker{flex-wrap:wrap}.period-picker label{min-width:0}.period-picker input{max-width:100%}
+}
+@media(max-width:760px){.credit-card-value{margin-top:16px}.credit-card-meta{font-size:13px}.mobile-header .icon-btn{color:#fff}.grid-form textarea{width:100%;padding:12px;border:1px solid #d7d7d7;border-radius:8px}}

@@ -41,6 +41,7 @@ export default function FinancialFilters({
           <MonthInput month={month} allowAll />
         </label>
       )}
+      <details className="extra-filters" open={!!category || sort !== "date_asc" || (receipts && status !== "ALL")}><summary>Mais filtros{category || sort !== "date_asc" || (receipts && status !== "ALL") ? " · ativos" : ""}</summary><div className="extra-filter-fields">
       <label>
         Categoria
         <select name="category" defaultValue={category}>
@@ -80,9 +81,10 @@ export default function FinancialFilters({
       ) : (
         <input type="hidden" name="status" value={status} />
       )}
+      </div></details>
       <div className="filter-actions">
         <button className="btn primary">Filtrar</button>
-        <Link className="btn secondary" href={action}>
+        <Link className="btn secondary" href={`${action}?month=${month}`}>
           Limpar filtros
         </Link>
       </div>

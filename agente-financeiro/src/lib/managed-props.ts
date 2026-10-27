@@ -19,6 +19,8 @@ export function managedProps(row: Payment | Receipt | Card): ManagedRecord {
   return {
     ...common,
     amount: row.amount,
+    priority: "priority" in row ? row.priority : undefined,
+    notes: "notes" in row ? row.notes : undefined,
     category: row.category,
     date: ("dueDate" in row ? row.dueDate : row.expectedAt).toISOString(),
     cancelledAt: row.cancelledAt?.toISOString() ?? null,

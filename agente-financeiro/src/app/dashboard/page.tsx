@@ -99,7 +99,7 @@ export default async function Dashboard({
   const summary = totals(payments, receipts);
   const pending = payments.filter((p) => remaining(p) > 0);
   return (
-    <AppShell active="/dashboard" userName={user.name}>
+    <AppShell active="/dashboard" userName={user.name} month={period.key}>
       <main className="page">
         <div className="page-head">
           <div>
@@ -179,9 +179,9 @@ export default async function Dashboard({
               "Receitas previstas menos o valor total das contas do mês.",
             ],
             [
-              "A pagar no mês",
+              "A pagar confirmado no mês",
               summary.pending,
-              `${pending.length} contas com saldo restante, incluindo parciais.`,
+              `${pending.length} contas com saldo restante. ${unreviewedCards > 0 ? `${unreviewedCards} cartão(ões) ainda precisam de revisão; o total pode aumentar.` : "Inclui pagamentos parciais."}`,
             ],
             [
               "Pago das contas do mês",
@@ -300,7 +300,7 @@ export default async function Dashboard({
             </EmptyState>
           ) : (
             <div className="table-wrap">
-              <table>
+              <table className="mobile-records">
                 <thead>
                   <tr>
                     <th>Conta</th>
@@ -312,7 +312,7 @@ export default async function Dashboard({
                 <tbody>
                   {pending.slice(0, 6).map((p) => (
                     <tr key={p.id}>
-                      <td>
+                      <td data-label="Conta">
                         <Link
                           className="text-link"
                           href={`/pagamentos?month=${period.key}#conta-${p.id}`}
@@ -321,12 +321,12 @@ export default async function Dashboard({
                         </Link>
                         <small>{p.category}</small>
                       </td>
-                      <td>
+                      <td data-label="Vencimento">
                         {shortDate.format(p.dueDate)}
                         <DueBadge payment={p} />
                       </td>
-                      <td>{brl.format(remaining(p))}</td>
-                      <td>
+                      <td data-label="Restante">{brl.format(remaining(p))}</td>
+                      <td data-label="Status">
                         <StatusBadge status={p.status} />
                       </td>
                     </tr>

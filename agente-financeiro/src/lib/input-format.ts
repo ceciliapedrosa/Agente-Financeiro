@@ -20,3 +20,9 @@ export function parseBRDate(raw: string): string {
 export function formatBRDate(iso: string) {
   return iso ? iso.split("-").reverse().join("/") : "";
 }
+
+export function maskDateInput(raw: string, monthOnly = false): string {
+  const digits = raw.replace(/\D/g, "").slice(0, monthOnly ? 6 : 8);
+  if (monthOnly) return digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits;
+  return digits.length > 4 ? `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}` : digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits;
+}
