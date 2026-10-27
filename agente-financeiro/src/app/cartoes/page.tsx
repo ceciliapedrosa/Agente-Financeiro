@@ -179,7 +179,7 @@ export default async function Page({
                       />
                       <Link
                         className="text-link"
-                        href={`/pagamentos?month=all${i.payment.cancelledAt ? "&status=CANCELLED" : ""}#conta-${i.payment.id}`}
+                        href={`/pagamentos?${period.search}${i.payment.cancelledAt ? "&status=CANCELLED" : ""}#conta-${i.payment.id}`}
                       >
                         Abrir despesa e histórico de pagamentos
                       </Link>

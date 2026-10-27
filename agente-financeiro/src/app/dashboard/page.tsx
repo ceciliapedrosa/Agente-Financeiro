@@ -243,8 +243,7 @@ export default async function Dashboard({
             <div>
               <h2>Precisa da sua atenção</h2>
               <p>
-                Vencimentos em relação a hoje, incluindo atrasos de meses
-                anteriores. Independente do período selecionado.
+                Vencimentos em relação a hoje, dentro do período selecionado.
               </p>
             </div>
           </div>
