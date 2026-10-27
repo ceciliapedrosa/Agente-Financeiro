@@ -1,3 +1,4 @@
+import {dateRange, type DateRangeQuery} from "@/lib/date-range";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getSessionUserId } from "@/lib/auth";
@@ -11,13 +12,13 @@ import { todayISO } from "@/lib/finance";
 import EmptyState from "@/components/EmptyState";
 import FinancialFilters from "@/components/FinancialFilters";
 import { brl } from "@/lib/format";
-import { monthPeriod, cents } from "@/lib/finance";
+import { cents } from "@/lib/finance";
 import { filterFinancialRows } from "@/lib/financial-search";
 const dates = new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" });
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{
+  searchParams: Promise<DateRangeQuery & {
     month?: string;
     q?: string;
     category?: string;
@@ -30,8 +31,7 @@ export default async function Page({
   const user = await db.user.findUnique({ where: { id: userId } });
   if (!user) redirect("/login");
   const query = await searchParams,
-    period = monthPeriod(query.month),
-    month = !query.month || query.month === "all" ? "all" : period.key;
+    period = dateRange(query,true);
   const q = (query.q ?? "").slice(0, 200),
     category = query.category ?? "",
     sort = ["date_asc", "date_desc", "amount_asc", "amount_desc"].includes(
@@ -53,7 +53,7 @@ export default async function Page({
       where: {
         userId,
         cancelledAt: status === "CANCELLED" ? { not: null } : null,
-        ...(month === "all"
+        ...(period.all
           ? {}
           : { expectedAt: { gte: period.start, lt: period.end } }),
       },
@@ -89,7 +89,7 @@ export default async function Page({
       rs.filter((r) => r.receivedAt).reduce((s, r) => s + cents(r.amount), 0) /
       100;
   return (
-    <AppShell active="/receitas" userName={user.name} month={month}>
+    <AppShell active="/receitas" userName={user.name} rangeQuery={period.search}>
       <main className="page">
         <div className="page-head">
           <div>
@@ -110,7 +110,7 @@ export default async function Page({
         <FinancialFilters
           key={JSON.stringify(query)}
           action="/receitas"
-          month={month}
+          period={period}
           status={status}
           q={q}
           category={category}

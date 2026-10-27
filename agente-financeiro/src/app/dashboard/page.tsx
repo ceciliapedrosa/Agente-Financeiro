@@ -1,13 +1,13 @@
+import {cashTotals} from "@/lib/cash-report";
+import {dateRange, type DateRangeQuery} from "@/lib/date-range";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getSessionUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { brl, shortDate } from "@/lib/format";
 import {
-  monthPeriod,
   remaining,
   totals,
-  paidValue,
   cents,
   todayISO,
 } from "@/lib/finance";
@@ -22,7 +22,7 @@ import { urgency, urgencyLabels } from "@/lib/urgency";
 export default async function Dashboard({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<DateRangeQuery & { month?: string }>;
 }) {
   const userId = await getSessionUserId();
   if (!userId) redirect("/login");
@@ -31,7 +31,7 @@ export default async function Dashboard({
     include: { _count: { select: { payments: true, receipts: true } } },
   });
   if (!user) redirect("/login");
-  const period = monthPeriod((await searchParams).month);
+  const period = dateRange(await searchParams);
   const range = { gte: period.start, lt: period.end };
   const today = todayISO();
   const attentionEnd = new Date(today + "T23:59:59Z");
@@ -57,23 +57,17 @@ export default async function Dashboard({
         where: {
           userId,
           cancelledAt: null,
-          receivedAt: { lte: new Date(today + "T23:59:59.999Z") },
+          receivedAt: range,
         },
         _sum: { amount: true },
       }),
-      db.payment.findMany({
-        where: {
-          userId,
-          cancelledAt: null,
-          OR: [{ status: "PAID" }, { paidAmount: { gt: 0 } }],
-        },
-      }),
+      db.payment.findMany({where:{userId,cancelledAt:null},include:{events:true}}),
       db.payment.findMany({
         where: {
           userId,
           cancelledAt: null,
           status: { not: "PAID" },
-          dueDate: { lte: attentionEnd },
+          dueDate: { ...range, lte: attentionEnd },
         },
         orderBy: { dueDate: "asc" },
       }),
@@ -84,7 +78,7 @@ export default async function Dashboard({
         userId,
         cancelledAt: null,
         receivedAt: null,
-        expectedAt: { lte: attentionEnd },
+        expectedAt: { ...range, lte: attentionEnd },
       },
       orderBy: { expectedAt: "asc" },
     }),
@@ -94,12 +88,12 @@ export default async function Dashboard({
   ]);
   const realized =
     (cents(receivedTotal._sum.amount ?? 0) -
-      recordedPayments.reduce((sum, p) => sum + cents(paidValue(p)), 0)) /
+      cents(cashTotals(recordedPayments, [], period.start, period.end).expenses)) /
     100;
   const summary = totals(payments, receipts);
   const pending = payments.filter((p) => remaining(p) > 0);
   return (
-    <AppShell active="/dashboard" userName={user.name} month={period.key}>
+    <AppShell active="/dashboard" userName={user.name} rangeQuery={period.search}>
       <main className="page">
         <div className="page-head">
           <div>
@@ -135,47 +129,47 @@ export default async function Dashboard({
         )}
         <section className="panel realized-balance">
           <div>
-            <h2>Saldo realizado registrado</h2>
+            <h2>Saldo realizado no período</h2>
             <p>
-              Entradas recebidas menos pagamentos registrados.
+              Entradas recebidas menos pagamentos registrados, pela data efetiva no período.
             </p>
           </div>
           <strong>{brl.format(realized)}</strong>
         </section>
-        <PeriodPicker action="/dashboard" month={period.key} />
+        <PeriodPicker action="/dashboard" period={period} />
         {summary.income === 0 && (
           <section className="panel guidance-card">
             <div>
               <h2>Adicione suas receitas de {period.label}</h2>
               <p>
                 Sem receitas cadastradas, a previsão considera apenas as contas.
-                Cadastre suas entradas para planejar o mês.
+                Cadastre suas entradas para planejar o período.
               </p>
             </div>
-            <ReceiptForm initialDate={period.key + "-01"} />
+            <ReceiptForm initialDate={period.from} />
           </section>
         )}
         <div className="stats-grid">
           {[
             [
-              "Saldo previsto do mês",
+              "Saldo previsto do período",
               summary.projected,
-              "Receitas previstas menos o valor total das contas do mês.",
+              "Receitas previstas menos o valor total das contas do período.",
             ],
             [
-              "A pagar confirmado no mês",
+              "A pagar confirmado no período",
               summary.pending,
               `${pending.length} contas com saldo restante. ${unreviewedCards > 0 ? `${unreviewedCards} cartão(ões) ainda precisam de revisão; o total pode aumentar.` : "Inclui pagamentos parciais."}`,
             ],
             [
-              "Pago das contas do mês",
+              "Pago das contas do período",
               summary.paid,
-              "Inclui pagamentos parciais das contas com vencimento neste mês.",
+              "Inclui pagamentos parciais das contas com vencimento neste período.",
             ],
             [
               "Receitas previstas",
               summary.income,
-              `${receipts.length} entradas com previsão neste mês.`,
+              `${receipts.length} entradas com previsão neste período.`,
             ],
           ].map(([label, value, help]) => (
             <div className="stat-card" key={String(label)}>
@@ -186,8 +180,8 @@ export default async function Dashboard({
           ))}
         </div>
         <details className="panel dashboard-help"><summary>Entenda os saldos e compromissos futuros</summary><p className="period-note">
-          O saldo realizado reúne todos os períodos, sem saldo bancário inicial. Os totais usam o vencimento das contas e a data prevista das receitas.
-          O saldo previsto não é seu saldo bancário. Compromissos após este mês:{" "}
+          O saldo realizado usa as datas efetivas do período selecionado, sem saldo bancário inicial. Os totais usam o vencimento das contas e a data prevista das receitas.
+          O saldo previsto não é seu saldo bancário. Compromissos após este período:{" "}
           <b>{brl.format(future.reduce((s, p) => s + remaining(p), 0))}</b>.
         </p></details>
         {unreviewedCards > 0 && (
@@ -199,7 +193,7 @@ export default async function Dashboard({
                 competência e situação definidas. Esses valores ainda não entram
                 como faturas confirmadas no planejamento.
               </p>
-              <Link className="text-link" href={`/cartoes?month=${period.key}`}>
+              <Link className="text-link" href={`/cartoes?${period.search}`}>
                 Revisar faturas →
               </Link>
             </div>
@@ -210,8 +204,7 @@ export default async function Dashboard({
             <div>
               <h2>Recebimentos para acompanhar</h2>
               <p>
-                Atrasos de todos os meses e entradas esperadas para hoje e os
-                próximos 7 dias.
+                Atrasos e entradas para hoje e os próximos 7 dias, dentro do período selecionado.
               </p>
             </div>
           </div>
@@ -227,7 +220,7 @@ export default async function Dashboard({
                 <Link
                   key={kind}
                   className={`attention-card attention-${kind.toLowerCase()}`}
-                  href={`/receitas?month=all&status=${kind}`}
+                  href={`/receitas?${period.search}&status=${kind}`}
                 >
                   <span>
                     {kind === "OVERDUE"
@@ -250,8 +243,7 @@ export default async function Dashboard({
             <div>
               <h2>Precisa da sua atenção</h2>
               <p>
-                Vencimentos em relação a hoje, incluindo atrasos de meses
-                anteriores. Independente do mês selecionado.
+                Vencimentos em relação a hoje, dentro do período selecionado.
               </p>
             </div>
           </div>
@@ -262,7 +254,7 @@ export default async function Dashboard({
               return (
                 <Link
                   key={kind}
-                  href={`/pagamentos?status=${kind}&month=${period.key}`}
+                  href={`/pagamentos?status=${kind}&${period.search}`}
                   className={`attention-card attention-${kind.toLowerCase()}`}
                 >
                   <span>{urgencyLabels[kind]}</span>
@@ -286,7 +278,7 @@ export default async function Dashboard({
               </p>
             </div>
             <Link
-              href={`/pagamentos?month=${period.key}`}
+              href={`/pagamentos?${period.search}`}
               className="text-link"
             >
               Ver todas
@@ -294,7 +286,7 @@ export default async function Dashboard({
           </div>
           {pending.length === 0 ? (
             <EmptyState
-              title="Nenhuma conta pendente neste mês"
+              title="Nenhuma conta pendente neste período"
               description="Cadastre sua próxima despesa para acompanhar os vencimentos e planejar quanto vai sobrar."
             >
               <PaymentForm buttonLabel="Adicionar despesa" />
@@ -316,7 +308,7 @@ export default async function Dashboard({
                       <td data-label="Conta">
                         <Link
                           className="text-link"
-                          href={`/pagamentos?month=${period.key}#conta-${p.id}`}
+                          href={`/pagamentos?${period.search}#conta-${p.id}`}
                         >
                           {p.name}
                         </Link>

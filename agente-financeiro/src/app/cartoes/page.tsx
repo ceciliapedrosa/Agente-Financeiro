@@ -1,3 +1,4 @@
+import {dateRange, type DateRangeQuery} from "@/lib/date-range";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getSessionUserId } from "@/lib/auth";
@@ -10,25 +11,25 @@ import PeriodPicker from "@/components/PeriodPicker";
 import StatusBadge from "@/components/StatusBadge";
 import { managedProps } from "@/lib/managed-props";
 import { brl } from "@/lib/format";
-import { cents, monthPeriod, paidValue, remaining } from "@/lib/finance";
+import { cents, paidValue, remaining } from "@/lib/finance";
 const date = new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" });
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; archived?: string }>;
+  searchParams: Promise<DateRangeQuery & { month?: string; archived?: string }>;
 }) {
   const userId = await getSessionUserId();
   if (!userId) redirect("/login");
   const user = await db.user.findUnique({ where: { id: userId } });
   if (!user) redirect("/login");
   const query = await searchParams,
-    period = monthPeriod(query.month);
+    period = dateRange(query);
   const [cards, payments] = await Promise.all([
     db.card.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },
       include: {
-        invoices: { where: { month: period.key }, include: { payment: true } },
+        invoices: { where: { payment: { dueDate: { gte: period.start, lt: period.end } } }, orderBy: { month: "asc" }, include: { payment: true } },
       },
     }),
     db.payment.findMany({
@@ -51,30 +52,30 @@ export default async function Page({
     query.archived === "1" ? !!c.archivedAt : !c.archivedAt,
   );
   return (
-    <AppShell active="/cartoes" userName={user.name} month={period.key}>
+    <AppShell active="/cartoes" userName={user.name} rangeQuery={period.search}>
       <main className="page">
         <div className="page-head">
           <div>
             <span className="kicker">CRÉDITO</span>
             <h1>Cartões e faturas</h1>
             <p>
-              Faturas de {period.label}. Cada fatura usa uma única despesa no
+              Faturas com vencimento de {period.label}. Cada fatura usa uma única despesa no
               planejamento.
             </p>
           </div>
           <CardForm />
         </div>
-        <PeriodPicker action="/cartoes" month={period.key} />
+        <PeriodPicker action="/cartoes" period={period} archived={query.archived} />
         <div className="tabs">
           <Link
             className={`tab ${query.archived !== "1" ? "active" : ""}`}
-            href={`/cartoes?month=${period.key}`}
+            href={`/cartoes?${period.search}`}
           >
             Ativos
           </Link>
           <Link
             className={`tab ${query.archived === "1" ? "active" : ""}`}
-            href={`/cartoes?month=${period.key}&archived=1`}
+            href={`/cartoes?${period.search}&archived=1`}
           >
             Arquivados
           </Link>
@@ -100,8 +101,8 @@ export default async function Page({
                 .filter((c) => !c.archivedAt)
                 .reduce((s, c) => s + cents(c.creditLimit), 0) / 100,
             ],
-            ["A pagar · competência selecionada", pending],
-            ["Pago · competência selecionada", paid],
+            ["A pagar · período selecionado", pending],
+            ["Pago · período selecionado", paid],
           ].map(([label, value]) => (
             <div className="stat-card" key={String(label)}>
               <small>{label}</small>
@@ -111,8 +112,7 @@ export default async function Page({
           ))}
         </div>
         <p className="period-note">
-          O painel considera o mês do vencimento real da despesa; esta tela usa
-          a competência da fatura. Arquivar um cartão não cancela suas dívidas.
+          O período usa o vencimento da fatura. A competência identifica o mês de referência. Arquivar um cartão não cancela suas dívidas.
         </p>
         <div className="card-grid">
           {shown.map((c) => (
@@ -179,7 +179,7 @@ export default async function Page({
                       />
                       <Link
                         className="text-link"
-                        href={`/pagamentos?month=all${i.payment.cancelledAt ? "&status=CANCELLED" : ""}#conta-${i.payment.id}`}
+                        href={`/pagamentos?${period.search}${i.payment.cancelledAt ? "&status=CANCELLED" : ""}#conta-${i.payment.id}`}
                       >
                         Abrir despesa e histórico de pagamentos
                       </Link>
