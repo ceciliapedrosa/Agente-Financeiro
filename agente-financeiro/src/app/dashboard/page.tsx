@@ -109,7 +109,7 @@ export default async function Dashboard({
           </div>
           <div className="quick-actions">
             <ReceiptForm buttonLabel="Adicionar receita" />
-            <PaymentForm buttonLabel="Adicionar despesa" />
+            <PaymentForm buttonLabel="Adicionar despesa" /><Link className="btn secondary" href="/importar">Importar planilha</Link>
           </div>
         </div>
         {user._count.payments === 0 && user._count.receipts === 0 && (
@@ -137,27 +137,11 @@ export default async function Dashboard({
           <div>
             <h2>Saldo realizado registrado</h2>
             <p>
-              Todos os períodos: receitas recebidas menos pagamentos registrados
-              até hoje. Sem saldo bancário inicial.
+              Entradas recebidas menos pagamentos registrados.
             </p>
           </div>
           <strong>{brl.format(realized)}</strong>
         </section>
-        {unreviewedCards > 0 && (
-          <section className="panel guidance-card">
-            <div>
-              <h2>Confirme as faturas dos seus cartões</h2>
-              <p>
-                {unreviewedCards} cartão(ões) têm valores antigos sem
-                competência e situação definidas. Esses valores ainda não entram
-                como faturas confirmadas no planejamento.
-              </p>
-              <Link className="text-link" href="/cartoes">
-                Revisar faturas →
-              </Link>
-            </div>
-          </section>
-        )}
         <PeriodPicker action="/dashboard" month={period.key} />
         {summary.income === 0 && (
           <section className="panel guidance-card">
@@ -201,12 +185,27 @@ export default async function Dashboard({
             </div>
           ))}
         </div>
-        <p className="period-note">
-          Os totais usam o vencimento das contas e a data prevista das receitas.
+        <details className="panel dashboard-help"><summary>Entenda os saldos e compromissos futuros</summary><p className="period-note">
+          O saldo realizado reúne todos os períodos, sem saldo bancário inicial. Os totais usam o vencimento das contas e a data prevista das receitas.
           O saldo previsto não é seu saldo bancário. Compromissos após este mês:{" "}
           <b>{brl.format(future.reduce((s, p) => s + remaining(p), 0))}</b>.
-        </p>
-        <section className="panel attention-panel">
+        </p></details>
+        {unreviewedCards > 0 && (
+          <section className="panel guidance-card">
+            <div>
+              <h2>Confirme as faturas dos seus cartões</h2>
+              <p>
+                {unreviewedCards} cartão(ões) têm valores antigos sem
+                competência e situação definidas. Esses valores ainda não entram
+                como faturas confirmadas no planejamento.
+              </p>
+              <Link className="text-link" href={`/cartoes?month=${period.key}`}>
+                Revisar faturas →
+              </Link>
+            </div>
+          </section>
+        )}
+        {expectedReceipts.length > 0 && <section className="panel attention-panel">
           <div className="panel-head">
             <div>
               <h2>Recebimentos para acompanhar</h2>
@@ -223,6 +222,7 @@ export default async function Dashboard({
                   ? r.expectedAt.toISOString().slice(0, 10) < today
                   : r.expectedAt.toISOString().slice(0, 10) >= today,
               );
+              if (!group.length) return null;
               return (
                 <Link
                   key={kind}
@@ -244,8 +244,8 @@ export default async function Dashboard({
               );
             })}
           </div>
-        </section>
-        <section className="panel attention-panel">
+        </section>}
+        {urgent.length > 0 && <section className="panel attention-panel">
           <div className="panel-head">
             <div>
               <h2>Precisa da sua atenção</h2>
@@ -258,6 +258,7 @@ export default async function Dashboard({
           <div className="attention-grid">
             {(["OVERDUE", "TODAY", "UPCOMING"] as const).map((kind) => {
               const group = urgent.filter((p) => urgency(p, today) === kind);
+              if (!group.length) return null;
               return (
                 <Link
                   key={kind}
@@ -275,7 +276,7 @@ export default async function Dashboard({
               );
             })}
           </div>
-        </section>
+        </section>}
         <section className="panel">
           <div className="panel-head">
             <div>

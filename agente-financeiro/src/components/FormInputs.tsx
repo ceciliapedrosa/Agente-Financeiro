@@ -1,5 +1,5 @@
 "use client";
-import { useId, useState, type InputHTMLAttributes } from "react";
+import { useId, useRef, useState, type InputHTMLAttributes } from "react";
 import {
   maskDateInput,
   parseBRMoney,
@@ -7,6 +7,7 @@ import {
   parseBRDate,
   formatBRDate,
 } from "@/lib/input-format";
+import { todayISO } from "@/lib/finance";
 type Props = InputHTMLAttributes<HTMLInputElement>;
 function message(input: HTMLInputElement) {
   const v = input.validity;
@@ -119,37 +120,23 @@ export function DateInput({
   required?: boolean;
 }) {
   const [raw, setRaw] = useState(formatBRDate(value ?? defaultValue));
+  const ref = useRef<HTMLInputElement>(null);
   const iso = parseBRDate(raw);
-  return (
-    <>
-      <TextInput
-        name={name + "Input"}
-        inputMode="numeric"
-        placeholder="DD/MM/AAAA"
-        maxLength={10}
-        value={raw}
-        required={required}
-        onChange={(e) => {
-          const text = maskDateInput(e.target.value),
-            next = parseBRDate(text);
-          setRaw(text);
-          onChange?.(next);
-          e.currentTarget.setCustomValidity(
-            !text && !required
-              ? ""
-              : !next
-                ? "Informe uma data válida no formato DD/MM/AAAA."
-                : min && next < min
-                  ? `Use uma data a partir de ${formatBRDate(min)}.`
-                  : max && next > max
-                    ? `Use uma data até ${formatBRDate(max)}.`
-                    : "",
-          );
-        }}
-      />
-      <input type="hidden" name={name} value={iso} />
-    </>
-  );
+  function update(text: string) {
+    const next = parseBRDate(text);
+    setRaw(text);
+    onChange?.(next);
+    const error = !text && !required ? "" : !next ? "Informe uma data válida. Digite apenas os números." : min && next < min ? `Use uma data a partir de ${formatBRDate(min)}.` : max && next > max ? `Use uma data até ${formatBRDate(max)}.` : "";
+    ref.current?.setCustomValidity(error);
+  }
+  return <span className="date-control">
+    <input ref={ref} name={name + "Input"} inputMode="numeric" placeholder="DD/MM/AAAA" maxLength={10} value={raw} required={required} onChange={e => update(maskDateInput(e.target.value))}/>
+    <span className="date-shortcuts">
+      <button type="button" className="small-action" onClick={() => update(formatBRDate(todayISO()))} disabled={!!((min && todayISO() < min) || (max && todayISO() > max))}>Hoje</button>
+      <input aria-label="Escolher data no calendário" type="date" min={min} max={max} value={iso} onChange={e => update(formatBRDate(e.target.value))}/>
+    </span>
+    <input type="hidden" name={name} value={iso}/>
+  </span>;
 }
 export function MonthInput({
   month,

@@ -2,6 +2,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Modal from "./Modal";
+import InvoiceFields, { type InvoiceCandidate } from "./InvoiceFields";
 import { DateInput, MoneyInput, TextInput, MonthInput } from "./FormInputs";
 import { todayISO } from "@/lib/finance";
 import { brl } from "@/lib/format";
@@ -10,6 +11,8 @@ export type ManagedRecord = {
   name: string;
   updatedAt: string;
   amount?: number;
+  paidAmount?: number;
+  selectedMonth?: string;
   category?: string;
   priority?: string;
   notes?: string | null;
@@ -47,6 +50,7 @@ type History = {
   after: Record<string, unknown>;
 };
 const labels: Record<string, string> = {
+  import: "Importado da planilha",
   invoiceperiod: "Competência corrigida",
   edit: "Editar",
   cancel: "Cancelar lançamento",
@@ -107,7 +111,7 @@ export default function RecordManager({
 }: {
   kind: "PAYMENT" | "RECEIPT" | "CARD";
   record: ManagedRecord;
-  payments?: { id: string; name: string; amount: number }[];
+  payments?: InvoiceCandidate[];
 }) {
   const router = useRouter(),
     request = useRef(0);
@@ -116,7 +120,7 @@ export default function RecordManager({
     [error, setError] = useState(""),
     [message, setMessage] = useState(""),
     [scope, setScope] = useState("ONE"),
-    [link, setLink] = useState(""),
+    [invoiceReady, setInvoiceReady] = useState(false),
     [history, setHistory] = useState<History[]>([]),
     [occurrences, setOccurrences] = useState<Occurrence[]>([]),
     [loading, setLoading] = useState(false),
@@ -125,7 +129,7 @@ export default function RecordManager({
     const token = ++request.current;
     setAction(next);
     setScope(next === "stop" ? "FUTURE" : "ONE");
-    setLink("");
+    setInvoiceReady(false);
     setError("");
     setMessage("");
     setHistory([]);
@@ -160,7 +164,7 @@ export default function RecordManager({
   }
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (busy) return;
+    if (busy || (action === "invoice" && !invoiceReady)) return;
     setBusy(true);
     setError("");
     try {
@@ -219,6 +223,11 @@ export default function RecordManager({
       o.status !== "PAID" &&
       !(o.paidAmount && o.paidAmount > 0),
   );
+  const selectedRows = scope === "ONE" ? [{amount:r.amount ?? 0, paid:kind === "RECEIPT" ? (r.receivedAt ? r.amount ?? 0 : 0) : r.paidAmount ?? 0}] : eligible.map(o=>({amount:o.amount,paid:0}));
+  const impactTotal=selectedRows.reduce((sum,o)=>sum+Math.round(o.amount*100),0)/100;
+  const impactPaid=selectedRows.reduce((sum,o)=>sum+Math.round(o.paid*100),0)/100;
+  const direction=action === "restore" ? -1 : 1;
+  const impactBalance=(kind === "PAYMENT" ? 1 : -1)*impactPaid*direction;
   return (
     <>
       <details className="record-menu">
@@ -358,52 +367,9 @@ export default function RecordManager({
                 />
               </label>
             )}
-            {action === "invoice" && (
-              <>
-                <p className="span2">
-                  A fatura será uma única despesa no planejamento. Se já
-                  cadastrou essa conta em Pagamentos, vincule-a para evitar
-                  duplicidade. Depois, registre o pagamento nas ações da fatura.
-                </p>
-                <label>
-                  Competência
-                  <MonthInput month={todayISO().slice(0, 7)} />
-                </label>
-                <label>
-                  Origem
-                  <select
-                    name="paymentId"
-                    value={link}
-                    onChange={(e) => setLink(e.target.value)}
-                  >
-                    <option value="">Criar nova despesa em aberto</option>
-                    {payments.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} · {brl.format(p.amount)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {!link && (
-                  <>
-                    <label>
-                      Valor da fatura
-                      <MoneyInput
-                        name="amount"
-                        defaultValue={r.currentInvoice || undefined}
-                      />
-                    </label>
-                    <label>
-                      Vencimento real
-                      <DateInput
-                        name="date"
-                        defaultValue={`${todayISO().slice(0, 7)}-${String(Math.min(r.dueDay ?? 1, new Date(Number(todayISO().slice(0, 4)), Number(todayISO().slice(5, 7)), 0).getDate())).padStart(2, "0")}`}
-                      />
-                    </label>
-                  </>
-                )}
-              </>
-            )}
+            {action === "invoice" && <InvoiceFields name={r.name} month={r.selectedMonth ?? todayISO().slice(0,7)} dueDay={r.dueDay ?? 1} amount={r.currentInvoice || undefined} payments={payments} onReady={setInvoiceReady}/>}
+            {["cancel", "restore", "stop"].includes(action) && <div className="span2 impact-preview" role="status"><strong>Impacto nos registros</strong><p>Valor {action === "restore" ? "reintegrado ao" : "retirado do"} planejamento: {brl.format(impactTotal)}.</p><p>Alteração do saldo realizado registrado (todos os períodos): {impactBalance >= 0 ? "+" : "−"}{brl.format(Math.abs(impactBalance))}.</p><p>Em aberto: {brl.format(impactTotal-impactPaid)}. Os valores seguem as datas de cada lançamento.</p></div>}
+            {action === "reverse" && <p className="span2 impact-preview">Saldo realizado: −{brl.format(r.amount ?? 0)}. Valor a receber: +{brl.format(r.amount ?? 0)}.</p>}
             {["cancel", "restore"].includes(action) && (
               <p className="span2">
                 {action === "cancel"
@@ -540,7 +506,7 @@ export default function RecordManager({
               >
                 Fechar
               </button>
-              {action !== "history" && (
+              {action !== "history" && (action !== "invoice" || invoiceReady) && (
                 <button
                   className="btn primary"
                   disabled={busy || loading || (scope !== "ONE" && !version)}

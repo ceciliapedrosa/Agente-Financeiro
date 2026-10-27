@@ -1,225 +1,42 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { brl } from "@/lib/format";
-import { monthPeriod, totals, remaining } from "@/lib/finance";
-import EmptyState from "@/components/EmptyState";
-import PaymentForm from "@/components/PaymentForm";
-import ReceiptForm from "@/components/ReceiptForm";
+import { monthPeriod, totals, paidValue } from "@/lib/finance";
+import { cashTotals } from "@/lib/cash-report";
 import AppShell from "@/components/AppShell";
 import PeriodPicker from "@/components/PeriodPicker";
-export default async function Page({
-  searchParams,
-}: {
-  searchParams: Promise<{ month?: string }>;
-}) {
-  const userId = await getSessionUserId();
-  if (!userId) redirect("/login");
-  const user = await db.user.findUnique({ where: { id: userId } });
-  if (!user) redirect("/login");
-  const period = monthPeriod((await searchParams).month);
-  const chartStart = new Date(period.start);
-  chartStart.setUTCMonth(chartStart.getUTCMonth() - 5);
-  const [historyPayments, historyReceipts] = await Promise.all([
-    db.payment.findMany({
-      where: {
-        userId,
-        cancelledAt: null,
-        dueDate: { gte: chartStart, lt: period.end },
-      },
-    }),
-    db.receipt.findMany({
-      where: {
-        userId,
-        cancelledAt: null,
-        expectedAt: { gte: chartStart, lt: period.end },
-      },
-    }),
-  ]);
-  const payments = historyPayments.filter((p) => p.dueDate >= period.start),
-    receipts = historyReceipts.filter((r) => r.expectedAt >= period.start);
-  const summary = totals(payments, receipts);
-  const data = Array.from({ length: 6 }, (_, i) => {
-    const start = new Date(chartStart);
-    start.setUTCMonth(start.getUTCMonth() + i);
-    const end = new Date(start);
-    end.setUTCMonth(end.getUTCMonth() + 1);
-    return {
-      key: start.toISOString().slice(0, 7),
-      label: new Intl.DateTimeFormat("pt-BR", {
-        month: "short",
-        year: "2-digit",
-        timeZone: "UTC",
-      }).format(start),
-      ...totals(
-        historyPayments.filter((p) => p.dueDate >= start && p.dueDate < end),
-        historyReceipts.filter(
-          (r) => r.expectedAt >= start && r.expectedAt < end,
-        ),
-      ),
-    };
-  });
-  const max = Math.max(1, ...data.flatMap((d) => [d.income, d.expenses]));
-  return (
-    <AppShell active="/relatorios" userName={user.name} month={period.key}>
-      <main className="page">
-        <div className="page-head">
-          <div>
-            <span className="kicker">ANÁLISE</span>
-            <h1>Relatórios</h1>
-            <p>
-              Resumo de {period.label} e comparação dos seis meses encerrados
-              nesse período.
-            </p>
-          </div>
-        </div>
-        <PeriodPicker action="/relatorios" month={period.key} />
-        {historyPayments.length === 0 && historyReceipts.length === 0 && (
-          <section className="panel">
-            <EmptyState
-              title="Seus relatórios começam com o primeiro lançamento"
-              description="Adicione receitas e despesas para acompanhar sua evolução e comparar os meses."
-            >
-              <ReceiptForm buttonLabel="Adicionar receita" />
-              <PaymentForm buttonLabel="Adicionar despesa" />
-            </EmptyState>
-          </section>
-        )}
-        <div className="stats-grid">
-          {[
-            ["Receitas previstas", summary.income],
-            ["Despesas do mês", summary.expenses],
-            ["Saldo previsto", summary.projected],
-            ["Pago das contas do mês", summary.paid],
-          ].map(([label, value]) => (
-            <div className="stat-card" key={String(label)}>
-              <small>{label}</small>
-              <strong>{brl.format(Number(value))}</strong>
-              <span>{period.label}</span>
-            </div>
-          ))}
-        </div>
-        <p className="period-note">
-          Receitas pela data prevista e despesas pelo vencimento. O total pago
-          inclui parcelas já registradas das contas desse mês; não representa
-          saídas por data de pagamento.
-        </p>
-        <section className="panel">
-          <div className="panel-head">
-            <div>
-              <h2>Receitas e despesas previstas — 6 meses</h2>
-              <p>Valores exatos disponíveis na tabela abaixo do gráfico.</p>
-            </div>
-          </div>
-          <div className="chart-legend">
-            <span>
-              <i className="legend-income" />
-              Receitas
-            </span>
-            <span>
-              <i className="legend-expense" />
-              Despesas
-            </span>
-          </div>
-          <div
-            className="bar-chart"
-            role="img"
-            aria-label="Comparação mensal de receitas previstas e despesas por vencimento. Consulte os valores na tabela seguinte."
-          >
-            {data.map((d) => (
-              <div className="bar-column" key={d.key}>
-                <div className="bar-stack">
-                  <div
-                    className="bar income"
-                    title={`Receitas: ${brl.format(d.income)}`}
-                    style={{ height: `${(d.income / max) * 180}px` }}
-                  />
-                  <div
-                    className="bar expense"
-                    title={`Despesas: ${brl.format(d.expenses)}`}
-                    style={{ height: `${(d.expenses / max) * 180}px` }}
-                  />
-                </div>
-                <span>{d.label}</span>
-              </div>
-            ))}
-          </div>
-          <div className="table-wrap">
-            <table className="mobile-records">
-              <caption className="table-caption">
-                Valores do comparativo mensal
-              </caption>
-              <thead>
-                <tr>
-                  <th>Mês</th>
-                  <th>Receitas previstas</th>
-                  <th>Despesas</th>
-                  <th>Saldo previsto</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.map((d) => (
-                  <tr key={d.key}>
-                    <th scope="row">{d.label}</th>
-                    <td data-label="Receitas previstas">{brl.format(d.income)}</td>
-                    <td data-label="Despesas">{brl.format(d.expenses)}</td>
-                    <td data-label="Saldo previsto">{brl.format(d.projected)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-        <div className="report-grid">
-          <section className="panel">
-            <div className="panel-head">
-              <h2>Resumo do mês</h2>
-            </div>
-            <div className="metric-list">
-              <div>
-                <span>Quantidade de contas</span>
-                <b>{payments.length}</b>
-              </div>
-              <div>
-                <span>Quantidade de receitas</span>
-                <b>{receipts.length}</b>
-              </div>
-              <div>
-                <span>Contas com saldo restante</span>
-                <b>{payments.filter((p) => remaining(p) > 0).length}</b>
-              </div>
-              <div>
-                <span>Total restante</span>
-                <b>{brl.format(summary.pending)}</b>
-              </div>
-            </div>
-          </section>
-          <section className="panel">
-            <div className="panel-head">
-              <h2>Maiores despesas do mês</h2>
-            </div>
-            <div className="metric-list">
-              {payments
-                .sort((a, b) => b.amount - a.amount)
-                .slice(0, 5)
-                .map((p) => (
-                  <div key={p.id}>
-                    <span>{p.name}</span>
-                    <b>{brl.format(p.amount)}</b>
-                  </div>
-                ))}
-              {!payments.length && (
-                <EmptyState
-                  title="Sem despesas neste mês"
-                  description="Registre uma despesa para identificar onde você mais gasta."
-                >
-                  <PaymentForm buttonLabel="Adicionar despesa" />
-                </EmptyState>
-              )}
-            </div>
-          </section>
-        </div>
-      </main>
-    </AppShell>
-  );
+export default async function Page({searchParams}:{searchParams:Promise<{month?:string;mode?:string}>}) {
+ const userId=await getSessionUserId(); if(!userId) redirect("/login");
+ const user=await db.user.findUnique({where:{id:userId}}); if(!user) redirect("/login");
+ const query=await searchParams, period=monthPeriod(query.month), mode=query.mode==="actual"?"actual":"planned";
+ const start=new Date(period.start); start.setUTCMonth(start.getUTCMonth()-5);
+ const [payments,receipts]=await Promise.all([
+  db.payment.findMany({where:{userId,cancelledAt:null},include:{events:true}}),
+  db.receipt.findMany({where:{userId,cancelledAt:null}})
+ ]);
+ const data=Array.from({length:6},(_,i)=>{const from=new Date(start);from.setUTCMonth(from.getUTCMonth()+i);const to=new Date(from);to.setUTCMonth(to.getUTCMonth()+1);
+  return {key:from.toISOString().slice(0,7),label:new Intl.DateTimeFormat("pt-BR",{month:"short",year:"numeric",timeZone:"UTC"}).format(from),
+   planned:totals(payments.filter(p=>p.dueDate>=from&&p.dueDate<to),receipts.filter(r=>r.expectedAt>=from&&r.expectedAt<to)),actual:cashTotals(payments,receipts,from,to)};
+ });
+ const current=data[5][mode], max=Math.max(1,...data.flatMap(d=>[Math.abs(d[mode].income),Math.abs(d[mode].expenses)]));
+ const unknown=payments.filter(p=>!p.events.length&&!p.paidAt&&paidValue(p)>0).length;
+ const legacy=payments.some(p=>p.events.some(e=>e.kind==="LEGACY"));
+ return <AppShell active="/relatorios" userName={user.name} month={period.key}><main className="page">
+  <div className="page-head"><div><span className="kicker">ANÁLISE</span><h1>Previsto × realizado</h1><p>Compare seu planejamento com os recebimentos e pagamentos registrados.</p></div></div>
+  <PeriodPicker month={period.key} action="/relatorios" mode={mode}/>
+  <nav className="tabs" aria-label="Visão do relatório">{[["planned","Previsto"],["actual","Realizado"]].map(([key,label])=><Link key={key} aria-current={mode===key?"page":undefined} className={`tab ${mode===key?"active":""}`} href={`/relatorios?month=${period.key}&mode=${key}`}>{label}</Link>)}</nav>
+  <p className="period-note">{mode==="actual"?"Realizado usa a data efetiva de recebimento e de cada pagamento parcial. Estornos aparecem como saídas negativas na data em que foram registrados. Não representa saldo bancário.":"Previsto usa a data prevista da receita e o vencimento da despesa, incluindo os valores já concluídos."} Lançamentos cancelados ficam fora de ambas as visões.</p>
+  {unknown>0&&<p role="status">{unknown} conta(s) antiga(s) com pagamento sem data ficam fora do realizado por mês. Confira seus históricos.</p>}
+  {legacy&&<p className="period-note">Há pagamentos antigos identificados como “Saldo pago anterior”: a data disponível pode representar o registro do saldo, sem detalhamento das parcelas originais.</p>}
+  <div className="stats-grid">{[[mode==="actual"?"Recebido":"Receitas previstas",current.income],[mode==="actual"?"Pago líquido de estornos":"Despesas previstas",current.expenses],[mode==="actual"?"Saldo realizado no mês":"Saldo previsto",current.projected]].map(([label,value])=><div className="stat-card" key={String(label)}><small>{label}</small><strong>{brl.format(Number(value))}</strong><span>{period.label}</span></div>)}</div>
+  <section className="panel"><div className="panel-head"><h2>{mode==="actual"?"Movimentações realizadas":"Planejamento"} — 6 meses</h2></div>
+   <div className="chart-legend"><span>Entradas: barra clara</span><span>Saídas: barra escura</span></div>
+   <div className="bar-chart" role="img" aria-label="Comparativo mensal. Valores e sinais na tabela abaixo.">{data.map(d=><div className="bar-column" key={d.key}><div className="bar-stack"><div className="bar income" title={brl.format(d[mode].income)} style={{height:`${Math.abs(d[mode].income)/max*180}px`}}/><div className="bar expense" title={brl.format(d[mode].expenses)} style={{height:`${Math.abs(d[mode].expenses)/max*180}px`}}/></div><span>{d.label}</span></div>)}</div>
+   <p className="period-note">As barras representam a magnitude; a tabela preserva os sinais, inclusive estornos.</p>
+   <div className="table-wrap"><table className="mobile-records"><caption className="table-caption">Comparação mensal completa</caption><thead><tr><th>Mês</th><th>Receitas previstas / recebidas</th><th>Despesas previstas / pagas</th><th>Saldo previsto / realizado</th></tr></thead><tbody>{data.map(d=><tr key={d.key}><th scope="row">{d.label}</th><td data-label="Receitas previstas / recebidas">{brl.format(d.planned.income)} / {brl.format(d.actual.income)}</td><td data-label="Despesas previstas / pagas">{brl.format(d.planned.expenses)} / {brl.format(d.actual.expenses)}</td><td data-label="Saldo previsto / realizado">{brl.format(d.planned.projected)} / {brl.format(d.actual.projected)}</td></tr>)}</tbody></table></div>
+  </section>
+ <section className="panel"><div className="panel-head"><h2>Maiores despesas previstas de {period.label}</h2></div><div className="metric-list">{payments.filter(p=>p.dueDate>=period.start&&p.dueDate<period.end).sort((a,b)=>b.amount-a.amount).slice(0,5).map(p=><div key={p.id}><Link href={`/pagamentos?month=${period.key}#conta-${p.id}`}>{p.name}</Link><b>{brl.format(p.amount)}</b></div>)}</div><p className="period-note">{payments.filter(p=>p.dueDate>=period.start&&p.dueDate<period.end).length} conta(s) no mês · restante previsto: {brl.format(data[5].planned.pending)}.</p></section>
+ </main></AppShell>;
 }
