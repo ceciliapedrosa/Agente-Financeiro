@@ -9,8 +9,8 @@ const nav = [
   ["/relatorios","Relatórios",BarChart3],
 ] as const;
 
-export default function AppShell({ children, active, userName, month }: { children: React.ReactNode; active: string; userName: string; month?: string }) {
-  const destination = (href: string) => month && month !== "all" ? `${href}?month=${month}` : (month === "all" && ["/pagamentos", "/receitas"].includes(href) ? `${href}?month=all` : href);
+export default function AppShell({ children, active, userName, month, rangeQuery }: { children: React.ReactNode; active: string; userName: string; month?: string; rangeQuery?: string }) {
+  const destination = (href: string) => rangeQuery ? `${href}?${rangeQuery}` : month && month !== "all" ? `${href}?month=${month}` : (month === "all" && ["/pagamentos", "/receitas"].includes(href) ? `${href}?month=all` : href);
   return <div className="app-shell">
     <aside className="sidebar">
       <div className="brand side-brand"><span className="brand-mark">D</span><span>DIZI</span></div>

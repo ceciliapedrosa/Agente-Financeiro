@@ -1,0 +1,14 @@
+import React from 'react';
+import {it,expect,vi,beforeEach} from 'vitest';
+const db=vi.hoisted(()=>({user:{findUnique:vi.fn()},payment:{findMany:vi.fn()},receipt:{findMany:vi.fn(),aggregate:vi.fn()},card:{findMany:vi.fn(),count:vi.fn()}}));
+vi.mock('@/lib/db',()=>({db}));vi.mock('@/lib/auth',()=>({getSessionUserId:async()=> 'owner'}));
+import Payments from '../src/app/pagamentos/page';
+import Receipts from '../src/app/receitas/page';
+import Cards from '../src/app/cartoes/page';
+import Dashboard from '../src/app/dashboard/page';
+const q={start:'2026-10-05',end:'2026-10-20'},range={gte:new Date('2026-10-05T00:00:00Z'),lt:new Date('2026-10-21T00:00:00Z')};
+beforeEach(()=>{vi.clearAllMocks();vi.stubGlobal('React',React);db.user.findUnique.mockResolvedValue({id:'owner',name:'Test',_count:{payments:1,receipts:1}});db.payment.findMany.mockResolvedValue([]);db.receipt.findMany.mockResolvedValue([]);db.receipt.aggregate.mockResolvedValue({_sum:{amount:0}});db.card.findMany.mockResolvedValue([]);db.card.count.mockResolvedValue(0);});
+it('payment urgency respects the selected range',async()=>{await Payments({searchParams:Promise.resolve({...q,status:'OVERDUE'})});expect(db.payment.findMany).toHaveBeenCalledWith(expect.objectContaining({where:expect.objectContaining({userId:'owner',dueDate:range})}));});
+it('receipts use expected dates',async()=>{await Receipts({searchParams:Promise.resolve(q)});expect(db.receipt.findMany).toHaveBeenCalledWith(expect.objectContaining({where:expect.objectContaining({expectedAt:range})}));});
+it('card invoices use payment due dates',async()=>{await Cards({searchParams:Promise.resolve(q)});expect(db.card.findMany).toHaveBeenCalledWith(expect.objectContaining({include:expect.objectContaining({invoices:expect.objectContaining({where:{payment:{dueDate:range}}})})}));});
+it('dashboard uses selected dates for planned and actual receipts',async()=>{await Dashboard({searchParams:Promise.resolve(q)});expect(db.receipt.aggregate).toHaveBeenCalledWith(expect.objectContaining({where:expect.objectContaining({receivedAt:range})}));expect(db.payment.findMany).toHaveBeenCalledWith(expect.objectContaining({where:expect.objectContaining({dueDate:range})}));});

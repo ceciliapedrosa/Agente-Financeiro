@@ -1,10 +1,11 @@
+import {dateRange, type DateRangeQuery} from "@/lib/date-range";
 import RecordManager from "@/components/RecordManager";
 import { managedProps } from "@/lib/managed-props";
 import { redirect } from "next/navigation";
 import { getSessionUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { brl } from "@/lib/format";
-import { monthPeriod, remaining, paidValue, todayISO } from "@/lib/finance";
+import { remaining, paidValue, todayISO } from "@/lib/finance";
 import AppShell from "@/components/AppShell";
 import PaymentForm from "@/components/PaymentForm";
 import PaymentAction from "@/components/PaymentAction";
@@ -20,7 +21,7 @@ const dateFormat = new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" });
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{
+  searchParams: Promise<DateRangeQuery & {
     status?: string;
     month?: string;
     q?: string;
@@ -33,7 +34,7 @@ export default async function Page({
   const user = await db.user.findUnique({ where: { id: userId } });
   if (!user) redirect("/login");
   const query = await searchParams;
-  const period = monthPeriod(query.month);
+  const period = dateRange(query,true);
   const status = [
     "CANCELLED",
     "ALL",
@@ -53,7 +54,6 @@ export default async function Page({
     )
       ? query.sort!
       : "date_asc";
-  const month = query.month === "all" ? "all" : period.key;
   const categoryRows = await db.payment.findMany({
     where: { userId },
     select: { category: true },
@@ -64,17 +64,11 @@ export default async function Page({
     .sort((a, b) => a.localeCompare(b, "pt-BR"));
   const urgentFilter = ["OVERDUE", "TODAY", "UPCOMING"].includes(status);
   const today = todayISO();
-  const end = new Date(today + "T23:59:59Z");
-  end.setUTCDate(end.getUTCDate() + 7);
   const all = await db.payment.findMany({
     where: {
       userId,
       cancelledAt: status === "CANCELLED" ? { not: null } : null,
-      ...(urgentFilter
-        ? { status: { not: "PAID" as const }, dueDate: { lte: end } }
-        : month === "all"
-          ? {}
-          : { dueDate: { gte: period.start, lt: period.end } }),
+      ...(period.all ? {} : { dueDate: { gte: period.start, lt: period.end } }),
     },
     orderBy: { dueDate: "asc" },
     include: { events: { orderBy: { createdAt: "asc" } } },
@@ -110,18 +104,14 @@ export default async function Page({
     ["CANCELLED", "Cancelados"],
   ];
   return (
-    <AppShell active="/pagamentos" userName={user.name} month={month}>
+    <AppShell active="/pagamentos" userName={user.name} rangeQuery={period.search}>
       <main className="page">
         <div className="page-head">
           <div>
             <span className="kicker">CONTROLE</span>
             <h1>Pagamentos</h1>
             <p>
-              {urgentFilter
-                ? "Vencimentos em relação a hoje, incluindo outros meses. O filtro de mês não limita esta lista."
-                : month === "all"
-                  ? "Contas de todos os meses. Abra o nome para ver detalhes."
-                  : `Contas com vencimento em ${period.label}. Abra o nome para ver detalhes.`}
+              Contas com vencimento em {period.label}. A urgência é calculada em relação a hoje, dentro deste período.
             </p>
           </div>
           <PaymentForm />
@@ -135,19 +125,18 @@ export default async function Page({
         <FinancialFilters
           key={JSON.stringify(query)}
           action="/pagamentos"
-          month={month}
+          period={period}
           status={status}
           q={q}
           category={category}
           sort={sort}
           categories={categories}
-          urgent={urgentFilter}
         />
         <div className="tabs">
           {tabs.map(([key, label]) => (
             <a
               key={key}
-              href={`/pagamentos?${new URLSearchParams({ status: key, month, q, category, sort }).toString()}`}
+              href={`/pagamentos?${new URLSearchParams({ status: key, ...Object.fromEntries(new URLSearchParams(period.search)), q, category, sort }).toString()}`}
               className={status === key ? "tab active" : "tab"}
             >
               {label}

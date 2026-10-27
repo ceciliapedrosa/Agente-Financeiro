@@ -1,24 +1,23 @@
 import Link from "next/link";
-import { MonthInput } from "./FormInputs";
+import DateRangeFields from "./DateRangeFields";
+import type {DateRange} from "@/lib/date-range";
 export default function FinancialFilters({
   action,
-  month,
+  period,
   status,
   q,
   category,
   sort,
   categories,
-  urgent = false,
   receipts = false,
 }: {
   action: string;
-  month: string;
+  period: DateRange;
   status: string;
   q: string;
   category: string;
   sort: string;
   categories: string[];
-  urgent?: boolean;
   receipts?: boolean;
 }) {
   return (
@@ -33,14 +32,9 @@ export default function FinancialFilters({
           placeholder={receipts ? "Ex.: Salário" : "Ex.: Internet"}
         />
       </label>
-      {urgent ? (
-        <input type="hidden" name="month" value={month} />
-      ) : (
-        <label>
-          Período
-          <MonthInput month={month} allowAll />
-        </label>
-      )}
+      <DateRangeFields key={period.search} from={period.from} to={period.to} all={period.all} allowAll/>
+      {period.error&&<p role="alert">{period.error}</p>}
+      <p className="period-note">Período aplicado: {period.label}.</p>
       <details className="extra-filters" open={!!category || sort !== "date_asc" || (receipts && status !== "ALL")}><summary>Mais filtros{category || sort !== "date_asc" || (receipts && status !== "ALL") ? " · ativos" : ""}</summary><div className="extra-filter-fields">
       <label>
         Categoria
@@ -84,7 +78,7 @@ export default function FinancialFilters({
       </div></details>
       <div className="filter-actions">
         <button className="btn primary">Filtrar</button>
-        <Link className="btn secondary" href={`${action}?month=${month}`}>
+        <Link className="btn secondary" href={`${action}?${period.search}`}>
           Limpar filtros
         </Link>
       </div>
