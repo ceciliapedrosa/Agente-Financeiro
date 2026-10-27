@@ -255,7 +255,7 @@ summary:focus-visible {
 .icon-btn{min-width:44px;min-height:44px}
 .status.overdue{color:#8a1c13!important;background:#fff0ed!important}
 @media(max-width:760px){
- .mobile-nav{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));position:fixed;bottom:0;left:0;right:0;z-index:40;background:#fff;border-top:1px solid #ddd;padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+ .mobile-nav{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));position:fixed;bottom:0;left:0;right:0;z-index:40;background:#fff;border-top:1px solid #ddd;padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
  .mobile-nav a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-height:52px;color:#555;font-size:11px;text-decoration:none;border-radius:8px}
  .mobile-nav a.active{background:#171717;color:#fff;font-weight:700}
  .content{padding-bottom:calc(82px + env(safe-area-inset-bottom));min-width:0}
@@ -282,3 +282,5 @@ summary:focus-visible {
 @media(max-width:760px){.period-picker{gap:8px}.period-picker label{flex:1;max-width:180px}.date-shortcuts input{font-size:16px;min-height:44px}.import-panel input,.import-panel textarea,.import-panel select{font-size:16px!important}.import-submit{bottom:calc(70px + env(safe-area-inset-bottom))}.bar-chart{gap:8px;padding:16px}.bar-column>span{font-size:11px}}
 
 .date-range-fields{border:0;padding:0;min-width:0;grid-column:span 2}.date-range-fields legend{font-size:13px;font-weight:700;margin-bottom:8px}.date-range-inputs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.date-range-inputs input{width:100%;min-width:0;min-height:48px;font-size:16px;box-sizing:border-box}.date-range-fields .range-all{display:flex;flex-direction:row;align-items:center;gap:8px}.date-range-fields .range-all input{width:20px;height:20px}.range-picker .date-range-fields{flex:1;max-width:600px}.range-picker label{max-width:none}.range-picker button{min-height:48px}.period-chart{overflow-x:auto;height:auto;min-height:270px}.period-chart .bar-column{min-width:90px}.period-chart .bar-column>span{max-width:120px;overflow-wrap:anywhere}@media(max-width:760px){.date-range-fields{grid-column:1/-1}.range-picker .date-range-fields{flex-basis:100%;width:100%}.date-range-inputs{grid-template-columns:1fr}.range-picker button{width:100%}.period-chart{justify-content:flex-start}}
+
+.bank-panel{padding:24px;margin:20px 0}.bank-actions{display:flex;flex-wrap:wrap;gap:12px;margin:16px 0}.bank-actions>p,.bank-actions>div[role="group"]{flex-basis:100%}.bank-consent{display:flex;align-items:flex-start;gap:10px;width:100%}.bank-consent input{width:20px;height:20px;flex-shrink:0}.bank-account{margin-top:16px;border-top:1px solid #ddd;padding-top:16px}.bank-account summary{cursor:pointer;padding:12px 0;font-weight:700}.bank-panel .btn{min-height:48px}@media(max-width:400px){.mobile-nav a{font-size:10px}.bank-panel{padding:16px}}

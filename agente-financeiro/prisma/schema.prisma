@@ -37,6 +37,7 @@ model User {
   payments            Payment[]
   receipts            Receipt[]
   cards               Card[]
+  bankConnections     BankConnection[]
   passwordResetTokens PasswordResetToken[]
 }
 
@@ -147,4 +148,18 @@ model RecordHistory {
  after Json
  createdAt DateTime @default(now())
  @@index([userId, recordId, createdAt])
+}
+
+model BankConnection {
+ id String @id @default(cuid())
+ userId String
+ user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+ itemId String? @unique
+ tokenHash String?
+ expiresAt DateTime
+ createdAt DateTime @default(now())
+ lastCheckedAt DateTime?
+ busyUntil DateTime?
+ snapshot Json?
+ @@index([userId, createdAt])
 }
