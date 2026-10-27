@@ -87,6 +87,15 @@ beforeEach(() => {
   mocks.session.mockResolvedValue("owner");
 });
 describe("editing and recoverable lifecycle", () => {
+  it("creates an already-paid invoice with an actual dated payment event", async () => {
+    await change({kind:"CARD",id:"c1",updatedAt:date.toISOString(),action:"invoice",month:"2026-10",amount:370,date:"2026-10-20",invoiceStatus:"PAID",paidAt:"2026-10-18"});
+    expect(tx.payment.create.mock.calls[0][0].data).toMatchObject({status:"PAID",paidAmount:370,events:{create:{amount:370,kind:"PAYMENT"}}});
+    expect(tx.cardInvoice.create).toHaveBeenCalledTimes(1);
+  });
+  it("rejects an invoice payment in the future before creating a debt", async () => {
+    await expect(change({kind:"CARD",id:"c1",updatedAt:date.toISOString(),action:"invoice",month:"2026-10",amount:370,date:"2026-10-20",invoiceStatus:"PAID",paidAt:"9998-10-18"})).rejects.toThrow("futuro");
+    expect(tx.payment.create).not.toHaveBeenCalled();
+  });
   it("edits priority and notes through the audited manager without losing partial payments", async () => {
     await change({ kind: "PAYMENT", id: "p1", updatedAt: date.toISOString(), action: "edit", name: "Internet", category: "Casa", amount: 100, date: "2026-10-01", priority: "HIGH", notes: " Conferir boleto " });
     expect(tx.payment.update.mock.calls[0][0].data).toMatchObject({ priority: "HIGH", notes: "Conferir boleto", paidAmount: 30, status: "PARTIAL" });

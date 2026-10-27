@@ -1,0 +1,4 @@
+Tipo;Descrição;Valor;Data;Status;Data efetiva;Categoria
+Receita;Salário;1600,00;05/10/2026;Prevista;;Salário
+Despesa;Internet;79,00;10/10/2026;Pendente;;Moradia
+Despesa;Telefone;44,99;01/10/2026;Pago;01/10/2026;Outros

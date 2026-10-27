@@ -54,6 +54,9 @@ const schema = z.object({
   dueDay: z.coerce.number().optional(),
   month: z.string().optional(),
   paymentId: z.string().optional(),
+  paymentUpdatedAt: z.string().optional(),
+  invoiceStatus: z.enum(["PENDING", "PAID"]).default("PENDING"),
+  paidAt: z.string().optional(),
   seriesVersion: z.string().optional(),
 });
 class Failure extends Error {
@@ -156,9 +159,12 @@ export async function changeRecord(
           throw new Failure(
             "Selecione uma despesa ativa, avulsa e ainda não vinculada.",
           );
+        if (d.paymentUpdatedAt) version(p, d.paymentUpdatedAt);
       } else {
         const value = amount.parse(d.amount),
           dueDate = calendarDate(day.parse(d.date));
+        const paidAt = d.invoiceStatus === "PAID" ? calendarDate(day.parse(d.paidAt)) : null;
+        if (d.invoiceStatus === "PAID" && d.paidAt! > todayISO()) throw new Failure("A data de pagamento não pode estar no futuro.");
         const p = await tx.payment.create({
           data: {
             userId,
@@ -166,6 +172,10 @@ export async function changeRecord(
             category: "Cartão de crédito",
             amount: value,
             dueDate,
+            status: d.invoiceStatus,
+            paidAmount: paidAt ? value : 0,
+            paidAt,
+            ...(paidAt ? {events:{create:{amount:value,paidAt,kind:"PAYMENT"}}} : {}),
           },
         });
         paymentId = p.id;

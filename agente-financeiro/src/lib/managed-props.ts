@@ -1,3 +1,4 @@
+import { paidValue } from "./finance";
 import type { Payment, Receipt, Card } from "@prisma/client";
 import type { ManagedRecord } from "@/components/RecordManager";
 export function managedProps(row: Payment | Receipt | Card): ManagedRecord {
@@ -19,6 +20,7 @@ export function managedProps(row: Payment | Receipt | Card): ManagedRecord {
   return {
     ...common,
     amount: row.amount,
+    paidAmount: "paidAmount" in row ? paidValue(row) : undefined,
     priority: "priority" in row ? row.priority : undefined,
     notes: "notes" in row ? row.notes : undefined,
     category: row.category,

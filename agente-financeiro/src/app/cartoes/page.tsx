@@ -33,7 +33,7 @@ export default async function Page({
     }),
     db.payment.findMany({
       where: { userId, cancelledAt: null, seriesId: null, invoice: null },
-      select: { id: true, name: true, amount: true },
+      select: { id: true, name: true, amount: true, dueDate: true, status: true, updatedAt: true },
       orderBy: { dueDate: "desc" },
     }),
   ]);
@@ -122,14 +122,14 @@ export default async function Page({
                   {c.institution}
                   {c.archivedAt ? " · Arquivado" : ""}
                 </small>
-                <h2>{c.name}</h2>
+                <h2>{c.name}</h2><p>{c.invoices.filter(i => !i.payment.cancelledAt).length ? `A pagar: ${brl.format(c.invoices.filter(i=>!i.payment.cancelledAt).reduce((sum,i)=>sum+remaining(i.payment),0))}` : "Fatura ainda não confirmada"}</p>
                 <div className="credit-card-meta">
                   <span>Limite {brl.format(c.creditLimit)}</span>
                   <span>Fecha dia {c.closingDay}</span>
                   <span>Vence dia {c.dueDay}</span>
                 </div>
               </div>
-              <div className="managed-card-body">
+              <details className="card-disclosure"><summary>Ver fatura e gerenciar cartão</summary><div className="managed-card-body">
                 {!c.invoiceReviewedAt && c.currentInvoice > 0 && (
                   <p className="period-note">
                     Valor antigo a confirmar:{" "}
@@ -138,8 +138,8 @@ export default async function Page({
                 )}
                 <RecordManager
                   kind="CARD"
-                  record={managedProps(c)}
-                  payments={payments}
+                  record={{...managedProps(c), selectedMonth: period.key}}
+                  payments={payments.map(p => ({...p, dueDate: p.dueDate.toISOString().slice(0,10), updatedAt: p.updatedAt.toISOString()}))}
                 />
                 {c.invoices.length === 0 ? (
                   <p>Nenhuma fatura confirmada em {period.label}.</p>
@@ -186,7 +186,7 @@ export default async function Page({
                     </div>
                   ))
                 )}
-              </div>
+              </div></details>
             </section>
           ))}
         </div>
