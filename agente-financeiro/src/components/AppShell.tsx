@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LayoutDashboard, ReceiptText, TrendingUp, CreditCard, BarChart3, LogOut } from "lucide-react";
+import { LayoutDashboard, ReceiptText, TrendingUp, CreditCard, BarChart3, Landmark, LogOut } from "lucide-react";
 
 const nav = [
   ["/dashboard","Visão geral",LayoutDashboard],
@@ -7,6 +7,7 @@ const nav = [
   ["/receitas","Receitas",TrendingUp],
   ["/cartoes","Cartões",CreditCard],
   ["/relatorios","Relatórios",BarChart3],
+  ["/bancos","Bancos",Landmark],
 ] as const;
 
 export default function AppShell({ children, active, userName, month, rangeQuery }: { children: React.ReactNode; active: string; userName: string; month?: string; rangeQuery?: string }) {
