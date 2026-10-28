@@ -1,0 +1,15 @@
+import {beforeEach,expect,it,vi} from 'vitest';
+const m=vi.hoisted(()=>({session:vi.fn(),upsert:vi.fn(),update:vi.fn(),remove:vi.fn(),updateMany:vi.fn(),user:vi.fn(),send:vi.fn(),config:vi.fn(),prefs:vi.fn()}));
+vi.mock('@/lib/auth',()=>({getSessionUserId:m.session}));
+vi.mock('@/lib/db',()=>({db:{notificationPreference:{upsert:m.upsert,update:m.update,updateMany:m.updateMany,findMany:m.prefs},pushSubscription:{deleteMany:m.remove},user:{findUniqueOrThrow:m.user}}}));
+vi.mock('@/lib/notifications',()=>({notificationConfig:m.config,hash:(s:string)=>'hash-'+s,sendEmail:m.send,deliverOnce:vi.fn(),sendPush:vi.fn()}));
+import {POST} from '@/app/api/notifications/route';
+import {GET} from '@/app/api/cron/notifications/route';
+const req=(body:object,origin='https://dizi.test')=>new Request('https://dizi.test/api/notifications',{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify(body)});
+beforeEach(()=>{vi.clearAllMocks();m.session.mockResolvedValue('owner');m.config.mockReturnValue({push:false,email:false,origin:'https://dizi.test'});m.upsert.mockResolvedValue({});});
+it('rejects unsigned and cross-origin preference writes',async()=>{m.session.mockResolvedValue(null);expect((await POST(req({action:'disablePush'}))).status).toBe(401);m.session.mockResolvedValue('owner');expect((await POST(req({action:'disablePush'},'https://evil.test'))).status).toBe(403);expect(m.remove).not.toHaveBeenCalled();});
+it('disable all devices only affects session owner',async()=>{expect((await POST(req({action:'disablePush',userId:'someone-else'}))).status).toBe(200);expect(m.remove).toHaveBeenCalledWith({where:{userId:'owner'}});});
+it('does not subscribe if provider is unconfigured',async()=>{expect((await POST(req({action:'enableEmail'}))).status).toBe(503);expect(m.send).not.toHaveBeenCalled();});
+it('expired or wrong-user confirmation cannot enable mail',async()=>{m.user.mockResolvedValue({email:'owner@example.test'});m.updateMany.mockResolvedValue({count:0});expect((await POST(req({action:'confirmEmail',token:'a'.repeat(64)}))).status).toBe(400);expect(m.updateMany).toHaveBeenCalledWith(expect.objectContaining({where:expect.objectContaining({userId:'owner',emailTokenHash:'hash-'+'a'.repeat(64)})}));});
+it('enforces confirmation throttle before any e-mail is sent',async()=>{m.config.mockReturnValue({email:true,origin:'https://dizi.test'});m.user.mockResolvedValue({email:'owner@example.test'});m.updateMany.mockResolvedValue({count:0});expect((await POST(req({action:'enableEmail'}))).status).toBe(429);expect(m.send).not.toHaveBeenCalled();});
+it('cron rejects absent/wrong secrets before accessing records',async()=>{vi.stubEnv('CRON_SECRET','x'.repeat(32));expect((await GET(new Request('https://dizi.test/api/cron/notifications'))).status).toBe(401);expect((await GET(new Request('https://dizi.test/api/cron/notifications',{headers:{authorization:'Bearer '+'é'.repeat(32)}}))).status).toBe(401);expect(m.prefs).not.toHaveBeenCalled();vi.unstubAllEnvs();});

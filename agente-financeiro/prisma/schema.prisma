@@ -37,6 +37,9 @@ model User {
   payments            Payment[]
   receipts            Receipt[]
   cards               Card[]
+  notificationPreference NotificationPreference?
+  pushSubscriptions PushSubscription[]
+  notificationDeliveries NotificationDelivery[]
   bankConnections     BankConnection[]
   passwordResetTokens PasswordResetToken[]
 }
@@ -161,5 +164,38 @@ model BankConnection {
  lastCheckedAt DateTime?
  busyUntil DateTime?
  snapshot Json?
+ @@index([userId, createdAt])
+}
+
+model NotificationPreference {
+ userId String @id
+ user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+ upcoming Boolean @default(true)
+ dueToday Boolean @default(true)
+ overdue Boolean @default(true)
+ receipts Boolean @default(false)
+ emailEnabled Boolean @default(false)
+ emailVerified String?
+ emailTokenHash String?
+ emailTokenExpires DateTime?
+ emailRequestedAt DateTime?
+}
+model PushSubscription {
+ id String @id @default(cuid())
+ userId String
+ user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+ endpoint String @unique
+ p256dh String
+ auth String
+ createdAt DateTime @default(now())
+ @@index([userId])
+}
+model NotificationDelivery {
+ id String @id
+ userId String
+ user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+ channel String
+ status String @default("CLAIMED")
+ createdAt DateTime @default(now())
  @@index([userId, createdAt])
 }

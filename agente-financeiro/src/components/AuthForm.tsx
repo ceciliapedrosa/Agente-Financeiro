@@ -28,7 +28,8 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
       );
       const data = await res.json();
       if (!res.ok) return setError(data.error || "Não foi possível continuar.");
-      router.push("/dashboard");
+      const next = new URLSearchParams(window.location.search).get("next") || "";
+      router.push(/^\/notificacoes\?confirm=[a-f0-9]{64}$/.test(next) ? next : "/dashboard");
       router.refresh();
     } catch {
       setError("Falha de conexão. Tente novamente.");
