@@ -1,0 +1,23 @@
+import {beforeEach,describe,expect,it,vi} from 'vitest';
+import {allowedPushEndpoint,defaultPreferences,reminderCounts,reminderText,notificationWindow} from '@/lib/notification-rules';
+const now=new Date('2026-10-28T12:00:00Z');
+const payment=(day:string,extra={})=>({amount:100,paidAmount:null,status:'PENDING',dueDate:new Date(day+'T00:00:00Z'),cancelledAt:null,...extra});
+describe('reminder rules',()=>{
+ it('includes today, overdue and exactly the next 3 days',()=>{expect(reminderCounts(['2026-10-27','2026-10-28','2026-10-29','2026-10-31','2026-11-01'].map(d=>payment(d)),[],defaultPreferences,now)).toEqual({overdue:1,dueToday:1,upcoming:2,receipts:0});});
+ it('ignores paid, cancelled and fully covered payments but keeps partial balance',()=>{expect(reminderCounts([payment('2026-10-27',{status:'PAID'}),payment('2026-10-27',{cancelledAt:now}),payment('2026-10-27',{paidAmount:100}),payment('2026-10-27',{status:'PARTIAL',paidAmount:50})],[],defaultPreferences,now).overdue).toBe(1);});
+ it('honors all opt outs and avoids empty summaries',()=>{const c=reminderCounts([payment('2026-10-27'),payment('2026-10-28')],[],{upcoming:false,dueToday:false,overdue:false,receipts:false},now);expect(reminderText(c)).toBe('');});
+ it('uses Brazilian day even before UTC 03:00 and handles month rollover',()=>{expect(notificationWindow(new Date('2026-11-01T02:00:00Z')).day).toBe('2026-10-31');});
+ it('receipts require opt-in and ignore received, future and cancelled records',()=>{const r=[{expectedAt:now,receivedAt:null,cancelledAt:null},{expectedAt:new Date('2026-10-29'),receivedAt:null,cancelledAt:null},{expectedAt:now,receivedAt:now,cancelledAt:null},{expectedAt:now,receivedAt:null,cancelledAt:now}];expect(reminderCounts([],r,defaultPreferences,now).receipts).toBe(0);expect(reminderCounts([],r,{...defaultPreferences,receipts:true},now).receipts).toBe(1);});
+ it.each(['http://fcm.googleapis.com/x','https://fcm.googleapis.com.evil.test/x','https://localhost/x','https://127.0.0.1/x','https://fcm.googleapis.com:8888/x','https://user@web.push.apple.com/x'])('rejects unsafe destination %s',u=>expect(allowedPushEndpoint(u)).toBe(false));
+ it.each(['https://fcm.googleapis.com/fcm/send/test','https://web.push.apple.com/test','https://updates.push.services.mozilla.com/wpush/v2/test','https://wns2.notify.windows.com/test'])('accepts known push service %s',u=>expect(allowedPushEndpoint(u)).toBe(true));
+});
+const mocks=vi.hoisted(()=>({createMany:vi.fn(),update:vi.fn(),send:vi.fn(),remove:vi.fn()}));
+vi.mock('@/lib/db',()=>({db:{notificationDelivery:{createMany:mocks.createMany,update:mocks.update},pushSubscription:{deleteMany:mocks.remove}}}));
+vi.mock('web-push',()=>({default:{sendNotification:mocks.send}}));
+import {deliverOnce,notificationConfig,sendPush} from '@/lib/notifications';
+beforeEach(()=>{vi.clearAllMocks();mocks.update.mockResolvedValue({});});
+it('does not send a duplicate claim',async()=>{mocks.createMany.mockResolvedValue({count:0});const send=vi.fn();expect(await deliverOnce('u','push','target','2026-10-28',send)).toBe(false);expect(send).not.toHaveBeenCalled();});
+it('records a provider error without leaking or resending the payload',async()=>{mocks.createMany.mockResolvedValue({count:1});const send=vi.fn().mockRejectedValue(new Error('secret'));await deliverOnce('u','email','target','2026-10-28',send);expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({data:{status:'FAILED'}}));expect(send).toHaveBeenCalledTimes(1);});
+it('marks successful delivery accepted',async()=>{mocks.createMany.mockResolvedValue({count:1});await deliverOnce('u','push','target','day',async()=>{});expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({data:{status:'SENT'}}));});
+it('removes expired push subscriptions',async()=>{mocks.send.mockRejectedValue({statusCode:410});await expect(sendPush({id:'s',endpoint:'https://fcm.googleapis.com/test',p256dh:'k',auth:'a'},'day')).rejects.toBeDefined();expect(mocks.remove).toHaveBeenCalledWith({where:{id:'s'}});});
+it('fails closed without configuration',()=>{vi.stubEnv('CRON_SECRET','');expect(notificationConfig().push).toBe(false);expect(notificationConfig().email).toBe(false);vi.unstubAllEnvs();});

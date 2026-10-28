@@ -12,7 +12,7 @@ try {
     (await readFile(
       new URL("./record-management.sql", import.meta.url),
       "utf8",
-    )) + "\n" + (await readFile(new URL("./bank-connections.sql", import.meta.url), "utf8"));
+    )) + "\n" + (await readFile(new URL("./bank-connections.sql", import.meta.url), "utf8")) + "\n" + (await readFile(new URL("./notifications.sql", import.meta.url), "utf8"));
   await db.$transaction(
     async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(73912051)`;
